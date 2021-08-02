@@ -22,7 +22,33 @@ def LoadImage(arg):
 
     cv2.stereovision
     
-
+    # for filename in images:
+    #     image = cv2.imread(filename)
+    #     grayColor = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    #     ret, corners = cv2.findChessboardCorners(
+    #                     grayColor, CHECKERBOARD,
+    #                     cv2.CALIB_CB_ADAPTIVE_THRESH
+    #                     + cv2.CALIB_CB_FAST_CHECK +
+    #                     cv2.CALIB_CB_NORMALIZE_IMAGE)
+    
+    #     if ret == True:
+    #         threedpoints.append(objectp3d)
+    
+    #         # Refining pixel coordinates
+    #         # for given 2d points.
+    #         corners2 = cv2.cornerSubPix(
+    #             grayColor, corners, (11, 11), (-1, -1), criteria)
+    
+    #         twodpoints.append(corners2)
+    
+    #         # Draw and display the corners
+    #         image = cv2.drawChessboardCorners(image,
+    #                                           CHECKERBOARD,
+    #                                           corners2, ret)
+    
+    #     cv2.imshow('img', image)
+    #     cv2.waitKey(0)
 
 
 
