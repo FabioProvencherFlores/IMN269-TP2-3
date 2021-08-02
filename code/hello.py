@@ -20,6 +20,10 @@ def LoadImage(arg):
     imgD = img[:,int(moitier):]
     print(len(imgG), len(imgG[0]))
     print(len(imgD),len(imgD[0]))
+    fondMat = cv2.compute_fundamental_matrix(imgG, imgD)
+    print("fondamental", fondMat)
+
+
     stereo = cv2.StereoBM_create(numDisparities=80, blockSize=11)
     disparity = stereo.compute(imgG,imgD)
     plt.figure(figsize = (20,10))
@@ -29,7 +33,6 @@ def LoadImage(arg):
 
     plt.show()
 
-    #cv2.waitKey(0)
     
     # for filename in images:
     #     image = cv2.imread(filename)
