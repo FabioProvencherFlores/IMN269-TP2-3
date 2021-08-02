@@ -4,23 +4,32 @@
 import numpy as np
 import cv2
 import sys
+from matplotlib import pyplot as plt
 
 def PrintHello():
     print("go fuck yourself")
 
 def LoadImage(arg):
-    img = cv2.imread(arg[1])
+    img = cv2.imread(arg[1], 0)
     print(len(img), len(img[0]))
+    # imgG = cv2.imread('images/othertest1.jpg', 0)
+    # imgD = cv2.imread('images/othertest2.jpg', 0)
 
     moitier = len(img[0])/2
-    imageG = img[:,:int(moitier)]
-    imageD = img[:,int(moitier)+1:]
-    cv2.imshow("fenetre image", imageG)
-    cv2.imshow("fenetre image2", imageD)
+    imgG = img[:,:int(moitier)]
+    imgD = img[:,int(moitier):]
+    print(len(imgG), len(imgG[0]))
+    print(len(imgD),len(imgD[0]))
+    stereo = cv2.StereoBM_create(numDisparities=80, blockSize=11)
+    disparity = stereo.compute(imgG,imgD)
+    plt.figure(figsize = (20,10))
+    plt.imshow(disparity,'Purples')
+    plt.xticks([])
+    plt.yticks([])
 
-    cv2.waitKey(0)
+    plt.show()
 
-    cv2.stereovision
+    #cv2.waitKey(0)
     
     # for filename in images:
     #     image = cv2.imread(filename)
