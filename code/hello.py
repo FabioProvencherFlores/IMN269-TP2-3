@@ -21,6 +21,8 @@ def Process(arg):
     imgD = img[:,int(moitier):]
     print(len(imgG), len(imgG[0]))
     print(len(imgD),len(imgD[0]))
+    
+    # Trouver les points d'interets
 
     sift = cv2.SIFT_create()
     pointsG = sift.detect(imgG,None)
@@ -29,59 +31,23 @@ def Process(arg):
     imgG=cv2.drawKeypoints(imgG,pointsG,imgG)
     imgD=cv2.drawKeypoints(imgD,pointsD,imgD)
     
-    res = cv2.hconcat(imgG, imgD)
+    res = cv2.hconcat([imgG, imgD])
+
+    print(len(res), len(res[0]))
 
     cv2.imshow("test", res)
     cv2.waitKey(0)
+    
+    # TODO
+    # extraire les points de pointsG et pointsD parce que cest des arrays weird...
 
-    # Trouver les points d'interets
-    contoursG = cv2.findContours(thresh, cv2.RETR_EXTERNAL)
+    #contoursG = cv2.findContours(thresh, cv2.RETR_EXTERNAL)
 
 
     # findFundamentaMat prend des array de points d interets, pas tous les images
-    fondMat = cv2.findFundamentalMat(imgG, imgD, cv2.FM_RANSAC)
-    print("fondamental", fondMat)
+    #fondMat = cv2.findFundamentalMat(a, a, cv2.FM_RANSAC, ransacReprojThreshold=1)
+    #print("fondamental", fondMat)
 
-
-    # stereo = cv2.StereoBM_create(numDisparities=80, blockSize=11)
-    # disparity = stereo.compute(imgG,imgD)
-    # plt.figure(figsize = (20,10))
-    # plt.imshow(disparity,'Purples')
-    # plt.xticks([])
-    # plt.yticks([])
-
-    # plt.show()
-
-
-    
-    
-    # for filename in images:
-    #     image = cv2.imread(filename)
-    #     grayColor = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    #     ret, corners = cv2.findChessboardCorners(
-    #                     grayColor, CHECKERBOARD,
-    #                     cv2.CALIB_CB_ADAPTIVE_THRESH
-    #                     + cv2.CALIB_CB_FAST_CHECK +
-    #                     cv2.CALIB_CB_NORMALIZE_IMAGE)
-    
-    #     if ret == True:
-    #         threedpoints.append(objectp3d)
-    
-    #         # Refining pixel coordinates
-    #         # for given 2d points.
-    #         corners2 = cv2.cornerSubPix(
-    #             grayColor, corners, (11, 11), (-1, -1), criteria)
-    
-    #         twodpoints.append(corners2)
-    
-    #         # Draw and display the corners
-    #         image = cv2.drawChessboardCorners(image,
-    #                                           CHECKERBOARD,
-    #                                           corners2, ret)
-    
-    #     cv2.imshow('img', image)
-    #     cv2.waitKey(0)
 
 
 
