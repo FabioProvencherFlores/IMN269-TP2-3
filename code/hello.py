@@ -9,7 +9,8 @@ from matplotlib import pyplot as plt
 def PrintHello():
     print("go fuck yourself")
 
-def LoadImage(arg):
+
+def Process(arg):
     img = cv2.imread(arg[1], 0)
     print(len(img), len(img[0]))
     # imgG = cv2.imread('images/othertest1.jpg', 0)
@@ -20,19 +21,39 @@ def LoadImage(arg):
     imgD = img[:,int(moitier):]
     print(len(imgG), len(imgG[0]))
     print(len(imgD),len(imgD[0]))
-    fondMat = cv2.compute_fundamental_matrix(imgG, imgD)
+
+    sift = cv2.SIFT_create()
+    pointsG = sift.detect(imgG,None)
+    pointsD = sift.detect(imgD,None)
+
+    imgG=cv2.drawKeypoints(imgG,pointsG,imgG)
+    imgD=cv2.drawKeypoints(imgD,pointsD,imgD)
+    
+    res = cv2.hconcat(imgG, imgD)
+
+    cv2.imshow("test", res)
+    cv2.waitKey(0)
+
+    # Trouver les points d'interets
+    contoursG = cv2.findContours(thresh, cv2.RETR_EXTERNAL)
+
+
+    # findFundamentaMat prend des array de points d interets, pas tous les images
+    fondMat = cv2.findFundamentalMat(imgG, imgD, cv2.FM_RANSAC)
     print("fondamental", fondMat)
 
 
-    stereo = cv2.StereoBM_create(numDisparities=80, blockSize=11)
-    disparity = stereo.compute(imgG,imgD)
-    plt.figure(figsize = (20,10))
-    plt.imshow(disparity,'Purples')
-    plt.xticks([])
-    plt.yticks([])
+    # stereo = cv2.StereoBM_create(numDisparities=80, blockSize=11)
+    # disparity = stereo.compute(imgG,imgD)
+    # plt.figure(figsize = (20,10))
+    # plt.imshow(disparity,'Purples')
+    # plt.xticks([])
+    # plt.yticks([])
 
-    plt.show()
+    # plt.show()
 
+
+    
     
     # for filename in images:
     #     image = cv2.imread(filename)
@@ -65,4 +86,4 @@ def LoadImage(arg):
 
 
 if __name__ == "__main__":
-    LoadImage(sys.argv)
+    Process(sys.argv)
