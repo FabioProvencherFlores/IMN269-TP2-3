@@ -35,37 +35,41 @@ def Calibrationnage():
         # print(len(img), len(img[0]))
         half = len(img[0])/2
         imgL = img[:, :int(half)]
-
+        print(len(imgL), len(imgL[0]))
         grayImg = cv.cvtColor(imgL, cv.COLOR_BGR2GRAY)
+
         found, cornersL = cv.findChessboardCorners(grayImg, (7, 9), None)
         if found == True:
+            cv.drawChessboardCorners(grayImg, (7, 9), cornersL, found)
             objPts.append(objP)
+            # cv.imshow("rwest", grayImg)
+            # cv.waitKey(5000)
 
-            cv.calibrateCamera(objPts, cornersL,(960,1280), camMat1,k)
-            #cv.cornerSubPix(grayImg, cornersL, (11, 11), (-1, -1), criteria)
+            # cv.calibrateCamera(objPts, cornersL, (960, 1280), camMat1, 0)
+            # cv.cornerSubPix(grayImg, cornersL, (11, 11), (-1, -1), criteria)
             imgPtsL.append(cornersL)
-
 
     for name in calibImages:
         img = cv.imread(name)
         half = len(img[0])/2
         imgR = img[:, int(half):]
-
         grayImg = cv.cvtColor(imgR, cv.COLOR_BGR2GRAY)
         found, cornersR = cv.findChessboardCorners(grayImg, (7, 9), None)
         if found == True:
             cv.cornerSubPix(grayImg, cornersR, (11, 11), (-1, -1), criteria)
+            cv.drawChessboardCorners(grayImg, (7, 9), cornersR, found)
+            cv.imshow("rwest", grayImg)
+            # cv.waitKey(5000)
             imgPtsR.append(cornersR)
-            # cv.drawChessboardCorners(grayImg, (7, 9), cornersR, found)
-            # cv.imshow("chessboard", grayImg)
-            # cv.waitKey(0)
+        # cv.drawChessboardCorners(grayImg, (7, 9), cornersR, found)
+        # cv.imshow("chessboard", grayImg)
+        # cv.waitKey(0)
 
     retVal, cm1, dc1, cm2, dc2, r, t, e, f = cv.stereoCalibrate(
-        objPts, imgPtsL, imgPtsR, camMat1, 0, camMat2, 0, (1280, 960), None, None)
-
-    
+        objPts, imgPtsL, imgPtsR, (1280, 960), None, None, None, None)
 
     print(retVal)
+    # print(objPts)
     print("cam mat 1: ", cm1)
     print("cam mat 2: ", cm2)
 
