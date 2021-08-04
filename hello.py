@@ -27,7 +27,10 @@ def Calibrationnage():
 
     for name in calibImages:
         img = cv.imread(name)
-        grayImg = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        half = len(img[0])/2
+        imgL = img[:, :int(half)]
+
+        grayImg = cv.cvtColor(imgL, cv.COLOR_BGR2GRAY)
         found, cornersL = cv.findChessboardCorners(grayImg, (7, 9), None)
         if found == True:
             objPtsL.append(objPts)
@@ -35,29 +38,41 @@ def Calibrationnage():
             cv.cornerSubPix(grayImg, cornersL, (11, 11), (-1, -1), criteria)
             imgPtsL.append(cornersL)
 
-    chessboard = cv.imread("images/calibragechessboard1.jpg", 0)
-    moitier = len(chessboard[0])/2
-    chessboardG = chessboard[:, :int(moitier)]
-    chessboardD = chessboard[:, int(moitier):]
+    for name in calibImages:
+        img = cv.imread(name)
+        half = len(img[0])/2
+        imgR = img[:, int(half):]
 
-    trouveG, coinsG = cv.findChessboardCorners(chessboardG, (7, 9), None)
-    cv.drawChessboardCorners(chessboardG, (7, 9), coinsG, trouveG)
-    trouveD, coinsD = cv.findChessboardCorners(chessboardD, (7, 9), None)
-    cv.drawChessboardCorners(chessboardD, (7, 9), coinsD, trouveD)
+        grayImg = cv.cvtColor(imgR, cv.COLOR_BGR2GRAY)
+        found, cornersR = cv.findChessboardCorners(grayImg, (7, 9), None)
+        if found == True:
+            objPtsR.append(objPts)
+
+            cv.cornerSubPix(grayImg, cornersR, (11, 11), (-1, -1), criteria)
+            imgPtsR.append(cornersR)
+
+    # chessboard = cv.imread("images/calibragechessboard1.jpg", 0)
+    # moitier = len(chessboard[0])/2
+    # chessboardG = chessboard[:, :int(moitier)]
+    # chessboardD = chessboard[:, int(moitier):]
+
+    # trouveG, coinsG = cv.findChessboardCorners(chessboardG, (7, 9), None)
+    # cv.drawChessboardCorners(chessboardG, (7, 9), coinsG, trouveG)
+    # trouveD, coinsD = cv.findChessboardCorners(chessboardD, (7, 9), None)
+    # cv.drawChessboardCorners(chessboardD, (7, 9), coinsD, trouveD)
 
     # 3D coordinates of chessboard points
+    # points_scene = []
+    # points_imageG = []
+    # points_imageD = []
 
-    points_scene = []
-    points_imageG = []
-    points_imageD = []
+    # points_scene.append()
+    # points_imageG.append(coinsG)
+    # points_imageD.append(coinsD)
 
-    points_scene.append()
-    points_imageG.append(coinsG)
-    points_imageD.append(coinsD)
-
-    res = cv.hconcat([chessboardG, chessboardD])
-    cv.imshow("testing", res)
-    cv.waitKey(0)
+    # res = cv.hconcat([chessboardG, chessboardD])
+    # cv.imshow("testing", res)
+    # cv.waitKey(0)
 
     return "f"
 
