@@ -28,8 +28,9 @@ def Calibrationnage():
     camMat2 = np.zeros((3, 3), np.float32)
 
     # print(calibImages)
-
+    i = 0
     for name in calibImages:
+        i += 1
         img = cv.imread(name)
         # print(img)
         # print(len(img), len(img[0]))
@@ -43,6 +44,9 @@ def Calibrationnage():
 
             cv.cornerSubPix(grayImg, cornersL, (11, 11), (-1, -1), criteria)
             imgPtsL.append(cornersL)
+
+            cv.drawChessboardCorners(grayImg, (7, 9), cornersL, found)
+            cv.imshow("corners", grayImg)
 
     for name in calibImages:
         img = cv.imread(name)
