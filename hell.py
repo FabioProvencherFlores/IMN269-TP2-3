@@ -56,11 +56,11 @@ def Calibrationnage():
             cv.cornerSubPix(grayImgR, cornersR, (11, 11), (-1, -1), criteria)
             imgPtsR.append(cornersR)
 
-            cv.drawChessboardCorners(imgL, cbSize, cornersL, foundL)
-            cv.imshow("l", imgL)
-            cv.drawChessboardCorners(imgR, cbSize, cornersR, foundR)
-            cv.imshow("r", imgR)
-            cv.waitKey(1000)
+            #cv.drawChessboardCorners(imgL, cbSize, cornersL, foundL)
+            #cv.imshow("l", imgL)
+            #cv.drawChessboardCorners(imgR, cbSize, cornersR, foundR)
+            #cv.imshow("r", imgR)
+            #cv.waitKey(1000)
 
     cv.destroyAllWindows()
 
@@ -93,11 +93,20 @@ def Calibrationnage():
     print("mat1", newCameraMatrixL)
     print("mat2", newCameraMatrixR)
 
-    return "f"
+    return fundamentalMatrix
+
+def Key2Coordo(keypt):
+    # for i in range(len(keypt)):
+    #     if(i<10):
+    #         print(np.float128(keypt[i].pt).reshape(-1, 1, 2))
+    #     coordo[i] = np.float128(keypt[i].pt).reshape(-1, 1, 2)
+    coordo = [k.pt for k in keypt]
+    ar = np.int32(coordo)
+    return ar
 
 
-def Process(arg):
-    img = cv.imread(arg[1], 0)
+def Process(F):
+    img = cv.imread("./images/cattest.jpg", 0)
     print(len(img), len(img[0]))
     # imgG = cv.imread('images/othertest1.jpg', 0)
     # imgD = cv.imread('images/othertest2.jpg', 0)
@@ -110,34 +119,70 @@ def Process(arg):
     print(len(imgG), len(imgG[0]))
     print(len(imgD), len(imgD[0]))
 
-    # TODO: calibrer les shits
 
     # Trouver les points d'interets
 
     sift = cv.SIFT_create()
-    pointsG = sift.detect(imgG, None)
-    pointsD = sift.detect(imgD, None)
+    keypointsG, waste1 = sift.detectAndCompute(imgG, None)
+    keypointsD, waste2 = sift.detectAndCompute(imgD, None)
 
-    imgG = cv.drawKeypoints(imgG, pointsG, imgG)
-    imgD = cv.drawKeypoints(imgD, pointsD, imgD)
+    # PrintPoints(keypointsD)
+    tupleG = Key2Coordo(keypointsG)
+    tupleD = Key2Coordo(keypointsD)
 
-    res = cv.hconcat([imgG, imgD])
 
-    print(len(res), len(res[0]))
+    
+    # for pt in tupleG:
+    #     cv.circle(imgD, pt,3,(0,0,200))
+    # for pt in tupleG:
+    #     cv.circle(imgG, pt,3,(0,0,200))
 
-    cv.imshow("test", res)
-    cv.waitKey(0)
+    FLANN_INDEX_KDTREE = 1
+    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+    search_params = dict(checks=50)
 
+    flann = cv.FlannBasedMatcher(index_params,search_params)
+    matches = flann.knnMatch(waste1,waste2,k=2)
+
+    pts1 = []
+    pts2 = []
+    # ratio test as per Lowe's paper
+    for i,(m,n) in enumerate(matches):
+        if m.distance < 0.8*n.distance:
+            pts2.append(keypointsG[m.trainIdx].pt)
+            pts1.append(keypointsD[m.queryIdx].pt)
     # TODO
     # extraire les points de pointsG et pointsD parce que cest des arrays weird...
 
-    # contoursG = cv.findContours(thresh, cv.RETR_EXTERNAL)
+    pts1 = np.int32(pts1)
+    pts2 = np.int32(pts2)
 
     # findFundamentaMat prend des array de points d interets, pas tous les images
-    # fondMat = cv.findFundamentalMat(a, a, cv.FM_RANSAC, ransacReprojThreshold=1)
-    # print("fondamental", fondMat)
+    fondMat, mask = cv.findFundamentalMat(tupleG, tupleD[:len(tupleG)], cv.FM_RANSAC, 3, 0.99)
+    pts1 = pts1[mask.ravel()==1]
+    pts2 = pts2[mask.ravel()==1]
 
+    lines = cv.computeCorrespondEpilines(pts2.reshape(-1,1,2), 2, fondMat)
+    lines = lines.reshapre(-1,3)
+
+    r,c = imgG.shape
+    imgG = cv.cvtColor(imgG,cv.COLOR_GRAY2BGR)
+    imgD = cv.cvtColor(imgD,cv.COLOR_GRAY2BGR)
+    for r,pt1,pt2 in zip(lines,pts1,pts2):
+        color = tuple(np.random.randint(0,255,3).tolist())
+        x0,y0 = map(int, [0, -r[2]/r[1] ])
+        x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
+        imgG = cv.line(imgG, (x0,y0), (x1,y1), color,1)
+        imgG = cv.circle(imgG,tuple(pt1),5,color,-1)
+        imgD = cv.circle(imgD,tuple(pt2),5,color,-1)
+    
+    #print(pointsG[:10])
+    res = cv.hconcat([imgG, imgD])
+    cv.imshow("resultat", res)
+    cv.waitKey(0)
 
 if __name__ == "__main__":
-    F = Calibrationnage()
-    # Process(sys.argv)
+    #F = Calibrationnage()
+    #print(F)
+    F= "f"
+    Process(F)
