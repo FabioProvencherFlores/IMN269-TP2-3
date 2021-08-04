@@ -18,7 +18,7 @@ def drawlines(img1,img2,lines,pts1,pts2):
 
 def Process():
 
-    img = cv.imread("./images/cattest.jpg", 0)
+    img = cv.imread("./whitebackground/testingwbg.jpg", 0)
     print(len(img), len(img[0]))
     # imgG = cv.imread('images/othertest1.jpg', 0)
     # imgD = cv.imread('images/othertest2.jpg', 0)
@@ -46,6 +46,7 @@ def Process():
     pointsG = np.int32(pointsG)
     pointsD = np.int32(pointsD)
     F, mask = cv.findFundamentalMat(pointsG,pointsD,cv.RANSAC, 3)
+    print(F)
     # We select only inlier points
     pointsG = pointsG[mask.ravel()==1]
     pointsD = pointsD[mask.ravel()==1]
@@ -67,6 +68,11 @@ def Process():
         imgG = cv.line(imgG, (x0,y0), (x1,y1), color,1)
         imgG = cv.circle(imgG,tuple(pt1),5,color,-1)
         imgD = cv.circle(imgD,tuple(pt2),5,color,-1)
+
+    
+
+    flann = cv.FlannBasedMatcher(index_params,search_params)
+    matches = flann.knnMatch(des1,des2,k=2)
 
 
     res = cv.hconcat([img5, img6])
