@@ -6,6 +6,7 @@ import cv2 as cv
 import sys
 from matplotlib import pyplot as plt
 
+
 def PrintHello():
     print("go fuck yourself")
 
@@ -46,11 +47,13 @@ def Process(arg):
     # imgD = cv.imread('images/othertest2.jpg', 0)
 
     moitier = len(img[0])/2
-    imgG = img[:,:int(moitier)]
-    imgD = img[:,int(moitier):]
+    imgG = img[:, :int(moitier)]
+    imgD = img[:, int(moitier):]
     print(len(imgG), len(imgG[0]))
-    print(len(imgD),len(imgD[0]))
-    
+    print(len(imgD), len(imgD[0]))
+
+    # TODO: calibrer les shits
+
     # Trouver les points d'interets
 
     sift = cv.SIFT_create()
@@ -72,12 +75,9 @@ def Process(arg):
 
     #contoursG = cv.findContours(thresh, cv.RETR_EXTERNAL)
 
-
     # findFundamentaMat prend des array de points d interets, pas tous les images
     #fondMat = cv.findFundamentalMat(a, a, cv.FM_RANSAC, ransacReprojThreshold=1)
     #print("fondamental", fondMat)
-
-
 
 
 if __name__ == "__main__":
