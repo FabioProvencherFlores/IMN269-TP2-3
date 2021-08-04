@@ -181,8 +181,12 @@ def Process(F):
     cv.imshow("resultat", res)
     cv.waitKey(0)
 
+    # lignes = cv.computeCorrespondEpilines(pointsD.reshape(-1,1,2), 2,F)
+    # lignes = lignes.reshape(-1,3)
+
+
 if __name__ == "__main__":
-    #F = Calibrationnage()
-    #print(F)
-    F= "f"
+    # F = Calibrationnage()
+    # print(F)
+    F = "f"
     Process(F)
