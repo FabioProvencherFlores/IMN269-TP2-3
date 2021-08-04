@@ -16,12 +16,12 @@ def Calibrationnage():
 
     criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-    objPts = np.zeros((7*9, 3), np.float32)
-    objPts[:, :2] = np.mgrid[0:7, 0:6].T.reshape(-1, 2)
+    objP = np.zeros((7*9, 3), np.float32)
+    objP[:, :2] = np.mgrid[0:7, 0:6].T.reshape(-1, 2)
+
     # var needed for calibration
     calibImages = glob.glob("./calibDir")
-    objPtsL = []
-    objPtsR = []
+    objPts = []
     imgPtsL = []
     imgPtsR = []
 
@@ -33,7 +33,7 @@ def Calibrationnage():
         grayImg = cv.cvtColor(imgL, cv.COLOR_BGR2GRAY)
         found, cornersL = cv.findChessboardCorners(grayImg, (7, 9), None)
         if found == True:
-            objPtsL.append(objPts)
+            objPts.append(objPts)
 
             cv.cornerSubPix(grayImg, cornersL, (11, 11), (-1, -1), criteria)
             imgPtsL.append(cornersL)
@@ -46,10 +46,14 @@ def Calibrationnage():
         grayImg = cv.cvtColor(imgR, cv.COLOR_BGR2GRAY)
         found, cornersR = cv.findChessboardCorners(grayImg, (7, 9), None)
         if found == True:
-            objPtsR.append(objPts)
-
             cv.cornerSubPix(grayImg, cornersR, (11, 11), (-1, -1), criteria)
             imgPtsR.append(cornersR)
+
+    retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F = cv.stereoCalibrate(
+        objPts, imgPtsL, imgPtsR, (1280, 960))
+
+    print("cam mat 1: ", cameraMatrix1)
+    print("cam mat 2: ", cameraMatrix2)
 
     # chessboard = cv.imread("images/calibragechessboard1.jpg", 0)
     # moitier = len(chessboard[0])/2
@@ -86,6 +90,8 @@ def Process(arg):
     moitier = len(img[0])/2
     imgG = img[:, :int(moitier)]
     imgD = img[:, int(moitier):]
+
+    # h = 960 w = 1280
     print(len(imgG), len(imgG[0]))
     print(len(imgD), len(imgD[0]))
 
