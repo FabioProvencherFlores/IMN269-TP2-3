@@ -19,7 +19,7 @@ objp[:, :2] = np.mgrid[0:chessboardSize[0],
                        0:chessboardSize[1]].T.reshape(-1, 2)
 
 objp = objp * 20
-print(objp)
+# print(objp)
 
 # Arrays to store object points and image points from all the images.
 objpoints = []  # 3d point in real world space
@@ -27,13 +27,15 @@ imgpointsL = []  # 2d points in image plane.
 imgpointsR = []  # 2d points in image plane.
 
 
-imagesLeft = glob.glob('images/stereoLeft/*.png')
-imagesRight = glob.glob('images/stereoRight/*.png')
+images = glob.glob("./calibDir/*")
 
-for imgLeft, imgRight in zip(imagesLeft, imagesRight):
+for name in images:
 
-    imgL = cv.imread(imgLeft)
-    imgR = cv.imread(imgRight)
+    img = cv.imread(name)
+    # print(len(img), len(img[0]))
+    half = len(img[0])/2
+    imgL = img[:, :int(half)]
+    imgR = img[:, int(half):]
     grayL = cv.cvtColor(imgL, cv.COLOR_BGR2GRAY)
     grayR = cv.cvtColor(imgR, cv.COLOR_BGR2GRAY)
 
@@ -93,6 +95,8 @@ criteria_stereo = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 retStereo, newCameraMatrixL, distL, newCameraMatrixR, distR, rot, trans, essentialMatrix, fundamentalMatrix = cv.stereoCalibrate(
     objpoints, imgpointsL, imgpointsR, newCameraMatrixL, distL, newCameraMatrixR, distR, grayL.shape[::-1], criteria_stereo, flags)
 
+print(newCameraMatrixR)
+print(newCameraMatrixL)
 
 ########## Stereo Rectification #################################################
 
