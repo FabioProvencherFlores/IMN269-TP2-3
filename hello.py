@@ -4,6 +4,7 @@
 import numpy as np
 import cv2 as cv
 import sys
+import random
 from matplotlib import pyplot as plt
 import glob
 
@@ -12,7 +13,7 @@ def PrintHello():
     print("go fuck yourself")
 
 
-def Calibrationnage():
+def CalibrationnageMulti():
 
     criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
@@ -41,8 +42,9 @@ def Calibrationnage():
         if found == True:
             objPts.append(objP)
 
-            cv.calibrateCamera(objPts, cornersL,(960,1280), camMat1,k)
+            retValL, camMatL, distL, rotationL, translationL = cv.calibrateCamera(objPts, cornersL,grayImg.shape[::-1], None, None)
             #cv.cornerSubPix(grayImg, cornersL, (11, 11), (-1, -1), criteria)
+
             imgPtsL.append(cornersL)
 
 
@@ -59,9 +61,11 @@ def Calibrationnage():
             # cv.drawChessboardCorners(grayImg, (7, 9), cornersR, found)
             # cv.imshow("chessboard", grayImg)
             # cv.waitKey(0)
+            retValR, camMatR, distR, rotationR, translationR = cv.calibrateCamera(objPts, cornersL,grayImg.shape[::-1], None, None)
+
 
     retVal, cm1, dc1, cm2, dc2, r, t, e, f = cv.stereoCalibrate(
-        objPts, imgPtsL, imgPtsR, camMat1, 0, camMat2, 0, (1280, 960), None, None)
+        objPts, imgPtsL, imgPtsR, camMatL, distL, camMatR, distR, (1280, 960), None, None)
 
     
 
@@ -69,31 +73,57 @@ def Calibrationnage():
     print("cam mat 1: ", cm1)
     print("cam mat 2: ", cm2)
 
-    # chessboard = cv.imread("images/calibragechessboard1.jpg", 0)
-    # moitier = len(chessboard[0])/2
-    # chessboardG = chessboard[:, :int(moitier)]
-    # chessboardD = chessboard[:, int(moitier):]
+    return "f"
 
-    # trouveG, coinsG = cv.findChessboardCorners(chessboardG, (7, 9), None)
-    # cv.drawChessboardCorners(chessboardG, (7, 9), coinsG, trouveG)
-    # trouveD, coinsD = cv.findChessboardCorners(chessboardD, (7, 9), None)
-    # cv.drawChessboardCorners(chessboardD, (7, 9), coinsD, trouveD)
+def CalibrageTest():
+    chessboard = cv.imread("images/calibragechessboard1.jpg", 0)
+    moitier = len(chessboard[0])/2
+    chessboardG = chessboard[:, :int(moitier)]
+    chessboardD = chessboard[:, int(moitier):]
+
+    trouveG, coinsG = cv.findChessboardCorners(chessboardG, (7, 9), None)
+    cv.drawChessboardCorners(chessboardG, (7, 9), coinsG, trouveG)
+    trouveD, coinsD = cv.findChessboardCorners(chessboardD, (7, 9), None)
+    cv.drawChessboardCorners(chessboardD, (7, 9), coinsD, trouveD)
 
     # 3D coordinates of chessboard points
-    # points_scene = []
-    # points_imageG = []
-    # points_imageD = []
+    points_scene = []
+    points_imageG = []
+    points_imageD = []
 
-    # points_scene.append()
-    # points_imageG.append(coinsG)
-    # points_imageD.append(coinsD)
+    points_imageG.append(coinsG)
+    points_imageD.append(coinsD)
 
-    # res = cv.hconcat([chessboardG, chessboardD])
-    # cv.imshow("testing", res)
-    # cv.waitKey(0)
+    fondMat = cv.findFundamentalMat(coinsG, coinsD, cv.FM_RANSAC, ransacReprojThreshold=1)
+    print(fondMat)
+    res = cv.hconcat([chessboardG, chessboardD])
+    cv.imshow("testing", res)
+    cv.waitKey(0)
 
     return "f"
 
+def PrintPoints(pts):
+    for i in range(1,10):
+        point = np.int32(pts[i].pt).reshape(-1, 1, 2)
+        print(point)
+
+
+def Key2Coordo(keypt):
+    coordo = np.array([len(keypt)])
+    # for i in range(len(keypt)):
+    #     if(i<10):
+    #         print(np.float128(keypt[i].pt).reshape(-1, 1, 2))
+    #     coordo[i] = np.float128(keypt[i].pt).reshape(-1, 1, 2)
+    coordo = [np.array(k.pt) for k in keypt]
+
+    return coordo
+
+
+
+def random_color():
+    rgbl=[255,0,0]
+    random.shuffle(rgbl)
+    return tuple(rgbl)
 
 def Process(arg):
     img = cv.imread(arg[1], 0)
@@ -114,15 +144,20 @@ def Process(arg):
     # Trouver les points d'interets
 
     sift = cv.SIFT_create()
-    pointsG = sift.detect(imgG, None)
-    pointsD = sift.detect(imgD, None)
+    keypointsG, waste1 = sift.detectAndCompute(imgG, None)
+    keypointsD, waste2 = sift.detectAndCompute(imgD, None)
 
-    imgG = cv.drawKeypoints(imgG, pointsG, imgG)
-    imgD = cv.drawKeypoints(imgD, pointsD, imgD)
+    # PrintPoints(keypointsD)
+    pointsG = Key2Coordo(keypointsG)
+    pointsD = Key2Coordo(keypointsD)
+    print(type(pointsG[0]))
+
+    # for pt in pointsG:
+    #     cv.circle(imgG,pt,1,random_color())
 
     res = cv.hconcat([imgG, imgD])
 
-    print(len(res), len(res[0]))
+    print(len(pointsG), len(pointsD))
 
     cv.imshow("test", res)
     cv.waitKey(0)
@@ -133,10 +168,10 @@ def Process(arg):
     # contoursG = cv.findContours(thresh, cv.RETR_EXTERNAL)
 
     # findFundamentaMat prend des array de points d interets, pas tous les images
-    # fondMat = cv.findFundamentalMat(a, a, cv.FM_RANSAC, ransacReprojThreshold=1)
-    # print("fondamental", fondMat)
+    fondMat = cv.findFundamentalMat(pointsG, pointsD[:len(pointsG)], cv.FM_RANSAC, 3, 0.99)
+    print("fondamental", fondMat)
 
 
 if __name__ == "__main__":
-    F = Calibrationnage()
-    # Process(sys.argv)
+    # F = CalibrageTest()
+    Process(sys.argv)
