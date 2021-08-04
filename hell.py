@@ -28,7 +28,7 @@ def PrintHello():
 def Calibrationnage():
 
     # var needed for calibration
-    calibImages = glob.glob("./calibDir/another/*")
+    calibImages = glob.glob("./calibDir/*")
 
     for name in calibImages:
         img = cv.imread(name)
@@ -37,7 +37,7 @@ def Calibrationnage():
         imgL = img[:, :int(half)]
         imgR = img[:, int(half):]
 
-        print(len(imgL), len(imgL[0]))
+        # print(len(imgL), len(imgL[0]))
         grayImgL = cv.cvtColor(imgL, cv.COLOR_BGR2GRAY)
         grayImgR = cv.cvtColor(imgR, cv.COLOR_BGR2GRAY)
         # cv.imshow("l", grayImgL)
@@ -46,9 +46,9 @@ def Calibrationnage():
         # cv.destroyAllWindows()
         foundL, cornersL = cv.findChessboardCorners(grayImgL, cbSize, None)
         foundR, cornersR = cv.findChessboardCorners(grayImgR, cbSize, None)
-        print(foundL, foundR)
+        # print(foundL, foundR)
         if foundR and foundL == True:
-            print("yays")
+            # print("yays")
             objPts.append(objP)
             cv.cornerSubPix(grayImgL, cornersL, (11, 11), (-1, -1), criteria)
             imgPtsL.append(cornersL)
