@@ -114,8 +114,8 @@ def Key2Coordo(keypt):
     #     if(i<10):
     #         print(np.float128(keypt[i].pt).reshape(-1, 1, 2))
     #     coordo[i] = np.float128(keypt[i].pt).reshape(-1, 1, 2)
-    coordo = [np.array(k.pt) for k in keypt]
-
+    coordo = [k.pt for k in keypt]
+    
     return coordo
 
 
@@ -148,16 +148,23 @@ def Process(arg):
     keypointsD, waste2 = sift.detectAndCompute(imgD, None)
 
     # PrintPoints(keypointsD)
-    pointsG = Key2Coordo(keypointsG)
-    pointsD = Key2Coordo(keypointsD)
-    print(type(pointsG[0]))
+    tupleG = Key2Coordo(keypointsG)
+    tupleD = Key2Coordo(keypointsD)
 
-    # for pt in pointsG:
-    #     cv.circle(imgG,pt,1,random_color())
+    pointsG = []
+    pointsD = []
+    
+    for pt in tupleG:
+        cv.circle(imgG,(int(pt[0]),int(pt[1])),3,random_color())
+        pointsG.extend((int(pt[0]),int(pt[1])))
+    for pt in tupleG:
+        cv.circle(imgD,(int(pt[0]),int(pt[1])),3,random_color())
+        pointsD.extend((int(pt[0]),int(pt[1])))
 
+    print(pointsG[:10])
     res = cv.hconcat([imgG, imgD])
 
-    print(len(pointsG), len(pointsD))
+
 
     cv.imshow("test", res)
     cv.waitKey(0)
@@ -168,7 +175,7 @@ def Process(arg):
     # contoursG = cv.findContours(thresh, cv.RETR_EXTERNAL)
 
     # findFundamentaMat prend des array de points d interets, pas tous les images
-    fondMat = cv.findFundamentalMat(pointsG, pointsD[:len(pointsG)], cv.FM_RANSAC, 3, 0.99)
+    fondMat = cv.findFundamentalMat(pointsG, pointsD[:len(pointsG)], cv.FM_RANSAC, 3)
     print("fondamental", fondMat)
 
 
