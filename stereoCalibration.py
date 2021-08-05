@@ -2,10 +2,12 @@
 # pip install numpy
 # pip install opencv-python
 import numpy as np
+from numpy import unravel_index
 import cv2 as cv
 import sys
-from matplotlib import pyplot as plt
 import glob
+from matplotlib import pyplot as plt
+from random import randrange
 
 # chessboard size
 cbSize = (7, 9)
@@ -101,10 +103,6 @@ def Calibrationnage():
 
 
 def Key2Coordo(keypt):
-    # for i in range(len(keypt)):
-    #     if(i<10):
-    #         print(np.float128(keypt[i].pt).reshape(-1, 1, 2))
-    #     coordo[i] = np.float128(keypt[i].pt).reshape(-1, 1, 2)
     coordo = [k.pt for k in keypt]
     ar = np.int32(coordo)
     return ar
@@ -188,8 +186,162 @@ def Process(F):
     # lignes = lignes.reshape(-1,3)
 
 
+# Copier de la doc
+# Voir https://docs.opencv.org/4.5.2/da/de9/tutorial_py_epipolar_geometry.html
+def drawlines(img1,img2,lines,pts1,pts2):
+    r,c = img1.shape
+    img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
+    img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
+    for r,pt1,pt2 in zip(lines,pts1,pts2):
+        color = tuple(np.random.randint(0,255,3).tolist())
+        x0,y0 = map(int, [0, -r[2]/r[1] ])
+        x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
+        img1 = cv.line(img1, (x0,y0), (x1,y1), color,1)
+        img1 = cv.circle(img1,tuple(pt1),5,color,-1)
+        img2 = cv.circle(img2,tuple(pt2),5,color,-1)
+    return img1,img2
+def drawdot(img1,img2,pts1,pts2):
+    r,c = img1.shape
+    img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
+    img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
+    for pt1,pt2 in zip(pts1,pts2):
+        color = tuple(np.random.randint(0,255,3).tolist())
+        img1 = cv.circle(img1,tuple(pt1),5,color,-1)
+        img2 = cv.circle(img2,tuple(pt2),5,color,-1)
+    return img1,img2
+
+def ConstructTemplate(img, coordo, size):
+    # compense pour le 0-padding
+    template = img[(coordo[0]-size):(coordo[0]+size), (coordo[1]-size):(coordo[1]+size)]
+    return template
+
+def PrintConcatImg(imgG, imgD, title):
+    res = cv.hconcat([imgG, imgD])
+    cv.imshow(title, res)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+
+def RunRansac():
+    #========================================================
+    #       HARDCODED PARAMS (a prendre en argument later)
+    #========================================================
+    confidenceBound = 0.2
+    nbIteration = 10
+    samplesize = 2
+    windowsize = 60 #en fait juste la moitier paire du windowsize
+
+
+    #========================================================
+    #       preparer l'image
+    #========================================================
+    imgName = "./images/cattest.jpg"
+    img = cv.imread(imgName, 0)
+
+    moitier = len(img[0])/2
+    imgG = img[:, :int(moitier)]
+    imgD = img[:, int(moitier):]
+
+    print("image {", imgName, "} is loaded")
+
+    #========================================================
+    #       trouver les points d'interes
+    #========================================================
+
+    edgesG = cv.Canny(imgG, 200, 200)
+    edgesD = cv.Canny(imgD, 200, 200)
+    print(len(edgesD),len(edgesD[0]))
+
+    sift = cv.SIFT_create()
+    keypointsG, waste1 = sift.detectAndCompute(edgesG, None)
+    keypointsD, waste2 = sift.detectAndCompute(edgesD, None)
+
+    coordoPtsG = Key2Coordo(keypointsG)
+    coordoPtsD = Key2Coordo(keypointsD)
+    nbPtsG = len(coordoPtsG)
+    nbPtsD = len(coordoPtsD)
+    print("found (", nbPtsG,",",nbPtsD, ") points d'interet")
+    print("for example: ", coordoPtsD[nbPtsD-3])
+   
+    imgptG, imgptD = drawdot(imgG, imgD, coordoPtsG, coordoPtsD)
+    imgPt = cv.hconcat([imgptG, imgptD])
+    cv.imshow("Points d'interes", imgPt)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+
+    #========================================================
+    #       Mise en correspondance initiale
+    #========================================================
+
+
+    paddedimgG = np.pad(edgesG, ((windowsize, windowsize), (windowsize,windowsize)), 'constant', constant_values=((0,0),(0,0)))
+
+    matchedptsD = []
+    matchedptsG = []
+    for pt in coordoPtsG:
+        if(windowsize < pt[0] < len(edgesG) and windowsize < pt[1] < len(edgesG[0])):
+            ptcoordo = (pt[1],pt[0]) #FUCK YOU PYTHON
+            template = ConstructTemplate(edgesG, ptcoordo, windowsize)
+            relationMat = cv.matchTemplate(edgesD, template, cv.TM_CCOEFF_NORMED)
+            maxCorrelationPt = unravel_index(relationMat.argmax(), relationMat.shape)
+            print("found matching max",maxCorrelationPt)
+            if(relationMat[maxCorrelationPt] >= confidenceBound):
+                matchedptsD.append(maxCorrelationPt)
+                matchedptsG.append(ptcoordo)
+
+
+    np.int32(matchedptsD)
+    np.int32(matchedptsG)
+
+    cormatG, cormatD = drawdot(edgesG, edgesD, matchedptsG,matchedptsD)
+    PrintConcatImg(cormatG,cormatD, "matching")
+    cormatG, cormatD = drawdot(imgG, imgD, matchedptsG,matchedptsD)
+    PrintConcatImg(cormatG,cormatD, "matching")
+
+
+
+        
+
+
+    #========================================================
+    #       Mise en correspondance avec un sous-ensemble aleatoire
+    #========================================================
+
+    randomSampledPts = []
+    for i in range(samplesize):
+        candidat = coordoPtsG[randrange(nbPtsG)]
+        randomSampledPts.append(candidat)
+        template = ConstructTemplate(paddedimgG, candidat, windowsize) 
+        
+
+
+
+
+    FLANN_INDEX_KDTREE = 1
+    index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+    search_params = dict(checks=50)
+
+    flann = cv.FlannBasedMatcher(index_params, search_params)
+    matches = flann.knnMatch(waste1, waste2, k=2)
+
+    pts1 = []
+    pts2 = []
+    # ratio test as per Lowe's paper
+    # for i, (m, n) in enumerate(matches):
+    #     if m.distance < 0.8*n.distance:
+    #         pts2.append(keypointsG[m.trainIdx].pt)
+    #         pts1.append(keypointsD[m.queryIdx].pt)
+    # TODO
+    # extraire les points de pointsG et pointsD parce que cest des arrays weird...
+
+    pts1 = np.int32(pts1)
+    pts2 = np.int32(pts2)
+    return "f"
+
+
 if __name__ == "__main__":
-    F = Calibrationnage()
+    #F = Calibrationnage()
     # print(F)
     F = "f"
-    Process(F)
+    #Process(F)
+    RunRansac()   
+    GenetateDepthMap(F)

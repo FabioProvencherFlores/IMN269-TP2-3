@@ -18,7 +18,7 @@ def drawlines(img1,img2,lines,pts1,pts2):
 
 def Process():
 
-    img = cv.imread("./whitebackground/testingwbg.jpg", 0)
+    img = cv.imread("./images/cattest.jpg", 0)
     print(len(img), len(img[0]))
     # imgG = cv.imread('images/othertest1.jpg', 0)
     # imgD = cv.imread('images/othertest2.jpg', 0)
