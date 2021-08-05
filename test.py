@@ -57,11 +57,11 @@ for name in images:
         imgpointsR.append(cornersR)
 
         # Draw and display the corners
-        cv.drawChessboardCorners(imgL, chessboardSize, cornersL, retL)
-        cv.imshow('img left', imgL)
-        cv.drawChessboardCorners(imgR, chessboardSize, cornersR, retR)
-        cv.imshow('img right', imgR)
-        cv.waitKey(1000)
+        # cv.drawChessboardCorners(imgL, chessboardSize, cornersL, retL)
+        # cv.imshow('img left', imgL)
+        # cv.drawChessboardCorners(imgR, chessboardSize, cornersR, retR)
+        # cv.imshow('img right', imgR)
+        # cv.waitKey(1000)
 
 
 cv.destroyAllWindows()
@@ -93,7 +93,7 @@ criteria_stereo = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
 # This step is performed to transformation between the two cameras and calculate Essential and Fundamenatl matrix
 retStereo, newCameraMatrixL, distL, newCameraMatrixR, distR, rot, trans, essentialMatrix, fundamentalMatrix = cv.stereoCalibrate(
-    objpoints, imgpointsL, imgpointsR, newCameraMatrixL, 0, newCameraMatrixR, 0, grayL.shape[::-1], criteria_stereo, flags)
+    objpoints, imgpointsL, imgpointsR, newCameraMatrixL, distL, newCameraMatrixR, distR, grayL.shape[::-1], criteria_stereo, flags)
 
 # print(newCameraMatrixR)
 # print(newCameraMatrixL)
@@ -102,8 +102,8 @@ print("mat2", newCameraMatrixR)
 print("fund: ", fundamentalMatrix)
 print("T: ", trans)
 print("R", rot)
-# print("dist L: ", distL)
-# print("dist R:", distR)
+print("dist L: ", distL)
+print("dist R:", distR)
 
 ########## Stereo Rectification #################################################
 
