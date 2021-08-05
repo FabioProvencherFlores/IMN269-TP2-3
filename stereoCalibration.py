@@ -280,11 +280,13 @@ def RunRansac():
     matchedptsG = []
     abberantD = []
     abberantG = []
+    it = 1
     for pt in coordoPtsG:
+        it += 1
         if(windowsize < pt[0] < len(imgG) and windowsize < pt[1] < len(imgG[0])):
             np.flip(pt, axis=None)
             template = ConstructTemplate(edgesG, pt, windowsize)
-            relationMat = cv.matchTemplate(edgesD, template, cv.TM_CCORR_NORMED)
+            relationMat = cv.matchTemplate(edgesG, template, cv.TM_CCORR_NORMED)
             cv.imshow("template", template)
             cv.imshow("relationmat", relationMat)
             cv.waitKey(0)
@@ -376,4 +378,4 @@ if __name__ == "__main__":
     F = "f"
     #Process(F)
     RunRansac()   
-    GenetateDepthMap(F)
+
