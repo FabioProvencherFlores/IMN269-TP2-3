@@ -4,6 +4,7 @@
 pip install numpy
 pip install opencv-python
 pip install matplotlib
+pip install scipy
 sudo apt-get install python3-tk
 
 ### Utilisation

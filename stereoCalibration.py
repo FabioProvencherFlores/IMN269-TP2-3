@@ -8,6 +8,7 @@ import sys
 import glob
 from matplotlib import pyplot as plt
 from random import randrange
+from scipy import signal
 
 # chessboard size
 cbSize = (7, 9)
@@ -188,20 +189,17 @@ def Process(F):
 
 # Copier de la doc
 # Voir https://docs.opencv.org/4.5.2/da/de9/tutorial_py_epipolar_geometry.html
-def drawlines(img1,img2,lines,pts1,pts2):
-    r,c = img1.shape
-    img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
-    img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
-    for r,pt1,pt2 in zip(lines,pts1,pts2):
+def drawlines(img1,img2, pts1,pts2):
+
+    for indx in range(len(pts1)):
+        
         color = tuple(np.random.randint(0,255,3).tolist())
-        x0,y0 = map(int, [0, -r[2]/r[1] ])
-        x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
+        x0,y0 = pts1[indx]
+        x1,y1 = pts2[indx]
         img1 = cv.line(img1, (x0,y0), (x1,y1), color,1)
-        img1 = cv.circle(img1,tuple(pt1),5,color,-1)
-        img2 = cv.circle(img2,tuple(pt2),5,color,-1)
     return img1,img2
+
 def drawdot(img1,img2,pts1,pts2):
-    r,c = img1.shape
     img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
     img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
     for pt1,pt2 in zip(pts1,pts2):
@@ -210,10 +208,15 @@ def drawdot(img1,img2,pts1,pts2):
         img2 = cv.circle(img2,tuple(pt2),5,color,-1)
     return img1,img2
 
-def ConstructTemplate(img, coordo, sizeT):
-    # compense pour le 0-padding
-    size = min(sizeT, coordo[0], coordo[1])
-    template = img[(coordo[0]-size):(coordo[0]+size), (coordo[1]-size):(coordo[1]+size)]
+def ConstructWindow(img, coordo, sizeT):
+    #reduit la taille de la fenetre sur les bords
+    Xlow = max(coordo[0]-sizeT, 0)
+    Xhigh = min(coordo[0]+ sizeT, len(img[0]))
+    Ylow = max(coordo[1]-sizeT, 0)
+    Yhigh = min(coordo[1]+ sizeT, len(img[0]))
+
+
+    template = img[Ylow:Yhigh, Xlow:Xhigh]
     return template
 
 def PrintConcatImg(imgG, imgD, title):
@@ -226,21 +229,25 @@ def RunRansac():
     #========================================================
     #       HARDCODED PARAMS (a prendre en argument later)
     #========================================================
-    confidenceBound = 0.8
+    confidenceBound = 0.55
     nbIteration = 10
     samplesize = 2
-    windowsize = 90 #en fait juste la moitier paire du windowsize
+    windowsize = 60 #en fait juste la moitier paire du windowsize
+    dispariteMax = 500
+    searchwindow = 200
 
 
     #========================================================
     #       preparer l'image
     #========================================================
-    imgName = "./images/testimage.jpg"
+    imgName = "./whitebackground/testingwbg.jpg"
     img = cv.imread(imgName, 0)
 
     moitier = len(img[0])/2
     imgG = img[:, :int(moitier)]
     imgD = img[:, int(moitier):]
+
+
 
     print("image {", imgName, "} is loaded")
 
@@ -248,9 +255,11 @@ def RunRansac():
     #       trouver les points d'interes
     #========================================================
 
-    edgesG = cv.Canny(imgG, 200, 200)
-    edgesD = cv.Canny(imgD, 200, 200)
+    edgesG = cv.Canny(imgG, 120, 120)
+    edgesD = cv.Canny(imgD, 120, 120)
     print(len(edgesD),len(edgesD[0]))
+
+
 
     sift = cv.SIFT_create()
     keypointsG, waste1 = sift.detectAndCompute(edgesG, None)
@@ -262,11 +271,11 @@ def RunRansac():
     nbPtsD = len(coordoPtsD)
     print("found (", nbPtsG,",",nbPtsD, ") points d'interet")
     print("for example: ", coordoPtsD[nbPtsD-3])
+
+    imgggg, imgddd = drawdot(edgesG, edgesD, coordoPtsG, coordoPtsD)
+    PrintConcatImg(imgggg, imgddd, "test")
    
-    imgptG, imgptD = drawdot(imgG, imgD, coordoPtsG, coordoPtsD)
-    imgPt = cv.hconcat([imgptG, imgptD])
-    #cv.imshow("Points d'interes", imgPt)
-    #cv.waitKey(0)
+
 
 
     #========================================================
@@ -280,43 +289,45 @@ def RunRansac():
     matchedptsG = []
     abberantD = []
     abberantG = []
-    it = 1
+    it = 0
+    nb = 0
     for pt in coordoPtsG:
         it += 1
-        if(windowsize < pt[0] < len(imgG) and windowsize < pt[1] < len(imgG[0])):
-            np.flip(pt, axis=None)
-            template = ConstructTemplate(edgesG, pt, windowsize)
-            relationMat = cv.matchTemplate(edgesG, template, cv.TM_CCORR_NORMED)
-            cv.imshow("template", template)
-            cv.imshow("relationmat", relationMat)
-            cv.waitKey(0)
+        if(it%15==0):
+            print(it)
 
-            trouve = np.where(relationMat >= confidenceBound)
-            trouve = list(zip(*trouve[::-1]))
-            #print(len(trouve))
-            _, maximum, _, location = cv.minMaxLoc(relationMat)
-            if(maximum >= confidenceBound):
+        # pour chaque poits Gauche
+        # creer une sousmatrice qui inclus le voisinage
+        template = ConstructWindow(imgG, pt, windowsize)
+            
+        
+        # evaluer tous les points Droits
+        maxCor = 0
+        match = (0,0)
+        for candidat in coordoPtsD:
+            if(abs(pt[1] - candidat[1]) < 30) and (abs(pt[0] - candidat[0]) < dispariteMax):
 
-                #print("confidence max", maximum, " trouve a ", location)
-                matchedptsG.append(pt)
-                matchedptsD.append(location)
+                sousFenetre = ConstructWindow(imgD, candidat, windowsize)
+                if(len(template) > len(sousFenetre)) or len(template[0]) > len(sousFenetre[0]):
+                    tempTemplate = ConstructWindow(imgG, pt, min(int(len(sousFenetre)/2),int(len(sousFenetre[0])/2)))
 
 
+                    corMatrice = cv.matchTemplate(sousFenetre, tempTemplate, cv.TM_CCORR_NORMED)
+                else:
+                    corMatrice = cv.matchTemplate(sousFenetre, template, cv.TM_CCORR_NORMED)
+                cor = max(map(max, corMatrice))
+                if cor > maxCor:
+                    maxCor = cor
+                    match = candidat
 
-            # maxCorrelationPt = unravel_index(relationMat.argmax(), relationMat.shape)
-            # #print("found matching max",maxCorrelationPt)
-            # if(relationMat[maxCorrelationPt] >= confidenceBound):
-            #     matchedptsD.append(maxCorrelationPt)
-            #     matchedptsG.append(pt)
-            #     matched = ConstructTemplate(imgD, maxCorrelationPt, windowsize)
-            #     print(maxCorrelationPt)
-            #     print(matched)
-            #     cv.imshow("found1", template)
-            #     cv.imshow("found2", matched)
-            #     cv.waitKey(0)
-            # else:
-            #     abberantD.append(maxCorrelationPt)
-            #     abberantG.append(pt)
+        #garder le maximum si un maximum est resonable
+        if(maxCor > confidenceBound):
+            matchedptsG.append(pt)
+            matchedptsD.append(match)
+            nb+=1
+            if(nb%10==0):
+                print("found ", nb, "matches so far")
+
 
     cv.destroyAllWindows()
     np.int32(matchedptsD)
@@ -325,7 +336,9 @@ def RunRansac():
 
 
     cormatG, cormatD = drawdot(imgG, imgD, matchedptsG,matchedptsD)
-    PrintConcatImg(cormatG,cormatD, "matching")
+    resG, resD = drawlines(cormatG, cormatD, matchedptsG,matchedptsD)
+    
+    PrintConcatImg(resG,resD, "matching")
     # cormatG, cormatD = drawdot(edgesG, imgD, abberantG,abberantD)
     # PrintConcatImg(cormatG,cormatD, "matching")
     # cormatG, cormatD = drawdot(imgG, imgD, matchedptsG,matchedptsD)
