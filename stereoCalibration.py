@@ -210,8 +210,9 @@ def drawdot(img1,img2,pts1,pts2):
         img2 = cv.circle(img2,tuple(pt2),5,color,-1)
     return img1,img2
 
-def ConstructTemplate(img, coordo, size):
+def ConstructTemplate(img, coordo, sizeT):
     # compense pour le 0-padding
+    size = min(sizeT, coordo[0], coordo[1])
     template = img[(coordo[0]-size):(coordo[0]+size), (coordo[1]-size):(coordo[1]+size)]
     return template
 
@@ -225,16 +226,16 @@ def RunRansac():
     #========================================================
     #       HARDCODED PARAMS (a prendre en argument later)
     #========================================================
-    confidenceBound = 0.2
+    confidenceBound = 0.8
     nbIteration = 10
     samplesize = 2
-    windowsize = 60 #en fait juste la moitier paire du windowsize
+    windowsize = 90 #en fait juste la moitier paire du windowsize
 
 
     #========================================================
     #       preparer l'image
     #========================================================
-    imgName = "./images/cattest.jpg"
+    imgName = "./images/testimage.jpg"
     img = cv.imread(imgName, 0)
 
     moitier = len(img[0])/2
@@ -264,39 +265,70 @@ def RunRansac():
    
     imgptG, imgptD = drawdot(imgG, imgD, coordoPtsG, coordoPtsD)
     imgPt = cv.hconcat([imgptG, imgptD])
-    cv.imshow("Points d'interes", imgPt)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    #cv.imshow("Points d'interes", imgPt)
+    #cv.waitKey(0)
+
 
     #========================================================
     #       Mise en correspondance initiale
     #========================================================
 
 
-    paddedimgG = np.pad(edgesG, ((windowsize, windowsize), (windowsize,windowsize)), 'constant', constant_values=((0,0),(0,0)))
+    # paddedimgG = np.pad(edgesG, ((windowsize, windowsize), (windowsize,windowsize)), 'constant', constant_values=((0,0),(0,0)))
 
     matchedptsD = []
     matchedptsG = []
+    abberantD = []
+    abberantG = []
     for pt in coordoPtsG:
-        if(windowsize < pt[0] < len(edgesG) and windowsize < pt[1] < len(edgesG[0])):
-            ptcoordo = (pt[1],pt[0]) #FUCK YOU PYTHON
-            template = ConstructTemplate(edgesG, ptcoordo, windowsize)
-            relationMat = cv.matchTemplate(edgesD, template, cv.TM_CCOEFF_NORMED)
-            maxCorrelationPt = unravel_index(relationMat.argmax(), relationMat.shape)
-            print("found matching max",maxCorrelationPt)
-            if(relationMat[maxCorrelationPt] >= confidenceBound):
-                matchedptsD.append(maxCorrelationPt)
-                matchedptsG.append(ptcoordo)
+        if(windowsize < pt[0] < len(imgG) and windowsize < pt[1] < len(imgG[0])):
+            np.flip(pt, axis=None)
+            template = ConstructTemplate(edgesG, pt, windowsize)
+            relationMat = cv.matchTemplate(edgesD, template, cv.TM_CCORR_NORMED)
+            cv.imshow("template", template)
+            cv.imshow("relationmat", relationMat)
+            cv.waitKey(0)
+
+            trouve = np.where(relationMat >= confidenceBound)
+            trouve = list(zip(*trouve[::-1]))
+            #print(len(trouve))
+            _, maximum, _, location = cv.minMaxLoc(relationMat)
+            if(maximum >= confidenceBound):
+
+                #print("confidence max", maximum, " trouve a ", location)
+                matchedptsG.append(pt)
+                matchedptsD.append(location)
 
 
+
+            # maxCorrelationPt = unravel_index(relationMat.argmax(), relationMat.shape)
+            # #print("found matching max",maxCorrelationPt)
+            # if(relationMat[maxCorrelationPt] >= confidenceBound):
+            #     matchedptsD.append(maxCorrelationPt)
+            #     matchedptsG.append(pt)
+            #     matched = ConstructTemplate(imgD, maxCorrelationPt, windowsize)
+            #     print(maxCorrelationPt)
+            #     print(matched)
+            #     cv.imshow("found1", template)
+            #     cv.imshow("found2", matched)
+            #     cv.waitKey(0)
+            # else:
+            #     abberantD.append(maxCorrelationPt)
+            #     abberantG.append(pt)
+
+    cv.destroyAllWindows()
     np.int32(matchedptsD)
     np.int32(matchedptsG)
 
-    cormatG, cormatD = drawdot(edgesG, edgesD, matchedptsG,matchedptsD)
-    PrintConcatImg(cormatG,cormatD, "matching")
+
+
     cormatG, cormatD = drawdot(imgG, imgD, matchedptsG,matchedptsD)
     PrintConcatImg(cormatG,cormatD, "matching")
-
+    # cormatG, cormatD = drawdot(edgesG, imgD, abberantG,abberantD)
+    # PrintConcatImg(cormatG,cormatD, "matching")
+    # cormatG, cormatD = drawdot(imgG, imgD, matchedptsG,matchedptsD)
+    # PrintConcatImg(cormatG,cormatD, "matching")
+    cv.destroyAllWindows()
 
 
         
@@ -306,11 +338,11 @@ def RunRansac():
     #       Mise en correspondance avec un sous-ensemble aleatoire
     #========================================================
 
-    randomSampledPts = []
-    for i in range(samplesize):
-        candidat = coordoPtsG[randrange(nbPtsG)]
-        randomSampledPts.append(candidat)
-        template = ConstructTemplate(paddedimgG, candidat, windowsize) 
+    # randomSampledPts = []
+    # for i in range(samplesize):
+    #     candidat = coordoPtsG[randrange(nbPtsG)]
+    #     randomSampledPts.append(candidat)
+    #     template = ConstructTemplate(paddedimgG, candidat, windowsize) 
         
 
 
