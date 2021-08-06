@@ -261,8 +261,9 @@ def RunRansac(FondMat):
     #========================================================
     #       preparer l'image
     #========================================================
-    #imgName = "./whitebackground/testingwbg.jpg"
-    imgName = "./images/cattest.jpg"
+    imgName = "./whitebackground/testingwbg.jpg"
+    #imgName = "./images/testimage.jpg"
+    #imgName = "./images/cattest.jpg"
     img = cv.imread(imgName, 0)
 
     moitier = len(img[0])/2
@@ -319,56 +320,58 @@ def RunRansac(FondMat):
         
 
     #========================================================
-    #       difference entre F et correlation
+    #       depth map
     #========================================================
-    toprintG = []
-    toprintD1 = []
-    toprintD2 = []
+
 
     # for ptG, ptD in matchedptsG, matchedptsD:
     #     line = cv.com
     pointsG = np.array(matchedptsG)
     pointsD = np.array(matchedptsD)
+    n = len(pointsG)
+    pt1 = np.reshape(pointsG,(1,n,2))
+    pt2 = np.reshape(pointsD,(1,n,2))   
+
+    p1, p2 = cv.correctMatches(FondMat,pt1, pt2)
+
+
+	# Setting parameters for StereoSGBM algorithm
+    minDisparity = 0
+    numDisparities = 64
+    blockSize =3
+    disp12MaxDiff = 90
+    uniquenessRatio = 10
+    speckleWindowSize =15
+    speckleRange = 8
+	 
+	# Creating an object of StereoSGBM algorithm
+    stereomatcher = cv.StereoSGBM_create(minDisparity = minDisparity,
+            numDisparities = numDisparities,
+            blockSize = blockSize,
+            disp12MaxDiff = disp12MaxDiff,
+            uniquenessRatio = uniquenessRatio,
+            speckleWindowSize = speckleWindowSize,
+            speckleRange = speckleRange
+        )
+
+    disparityMap = stereomatcher.compute(imgG, imgD).astype(np.float32)
+    disparityMap = cv.cvtColor(disparityMap,cv.COLOR_GRAY2BGR)
+    # for kptG in matchedptsG:
+    #     color = tuple(np.random.randint(0,255,3).tolist())
+    #     disparityMap = cv.circle(disparityMap,tuple(kptG),5,color,-1)
+
+    cv.imwrite("result/disparitymap.jpg", disparityMap)
 
     lines = cv.computeCorrespondEpilines(pointsG.reshape(-1,1,2), 2,FondMat)
     lines = lines.reshape(-1,3)
     resG,resD = drawepipipiplines(imgG,imgD,lines,pointsG,matchedptsD)
-    #PrintConcatImg(resG, resD, "testtt")
-
-    img1 = imgG.copy()
-    img2 = imgD.copy()
-    r,c = img1.shape 
-    img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
-    img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
-    print("to test now...", len(pointsG))
-    asdf = 0
-    for r,pt1,pt2 in zip(lines,pointsG,pointsD):
-        asdf+=1
-        if(asdf%15 == 0):
-            print(asdf)
-        color = tuple(np.random.randint(0,255,3).tolist())
-        x0,y0 = map(int, [0, -r[2]/r[1] ])
-        x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
-        x = [x0, x1]
-        y = [y0, y1]
-        x_coor = np.arange(1, x1)
-        y_coor = np.interp(x_coor, x, y)
-        coordinates = np.column_stack((x_coor, y_coor))
-        linePT = np.int32(coordinates)
-        ptTest = []
-        for p in linePT:
-            if p[0] < len(img1) and p[1] < len(img1[1]):
-                ptTest.append(p)
-
-        foundpt, cor = FindSinglePoint(img1, img2, pt1, np.int32(ptTest),windowsize, dispariteMax)
-        if(cor > confidenceBound):
-            toprintG.append(pt1)
-            toprintD1.append(pt2)
-            toprintD2.append(foundpt)
+    SaveImg(resG,resD,"droiteepipolaire.jpg")
 
 
 
-    print("finalement", len(toprintG))
+
+
+
 
 if __name__ == "__main__":
     F = Calibrationnage()
