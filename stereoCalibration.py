@@ -207,6 +207,19 @@ def drawdot(img1,img2,pts1,pts2):
         img1 = cv.circle(img1,tuple(pt1),5,color,-1)
         img2 = cv.circle(img2,tuple(pt2),5,color,-1)
     return img1,img2
+    
+def drawdotetline(img1, img2, pts1, pts2):
+    img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
+    img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
+    for indx in range(len(pts1)):
+    
+        color = tuple(np.random.randint(0,255,3).tolist())
+        p1 = pts1[indx]
+        p2 = pts2[indx]
+        img1 = cv.circle(img1,p1,5,color,-1)
+        img2 = cv.circle(img2,p2,5,color,-1)
+        img1 = cv.line(img1, p1, p2, color,1)
+    return img1, img2
 
 def ConstructWindow(img, coordo, sizeT):
     #reduit la taille de la fenetre sur les bords
@@ -225,22 +238,83 @@ def PrintConcatImg(imgG, imgD, title):
     cv.waitKey(0)
     cv.destroyAllWindows()
 
+def FindMatches(imgG, imgD, pointsG, pointsD, boxsize, disparityMax, confidenceBound):
+    matchedptsD = []
+    matchedptsG = []
+    abberantD = []
+    abberantG = []
+    it = 0
+    nb = 0
+    for pt in pointsG:
+        it += 1
+        if(it%15==0):
+            print(it)
+
+        # pour chaque poits Gauche
+        # creer une sousmatrice qui inclus le voisinage
+        template = ConstructWindow(imgG, pt, boxsize)
+            
+        
+        # evaluer tous les points Droits
+        maxCor = 0
+        match = (0,0)
+        for candidat in pointsD:
+            if(abs(pt[1] - candidat[1]) < 30) and (abs(pt[0] - candidat[0]) < disparityMax):
+
+                sousFenetre = ConstructWindow(imgD, candidat, boxsize)
+                if(len(template) > len(sousFenetre)) or len(template[0]) > len(sousFenetre[0]):
+                    tempTemplate = ConstructWindow(imgG, pt, min(int(len(sousFenetre)/2),int(len(sousFenetre[0])/2)))
+
+
+                    corMatrice = cv.matchTemplate(sousFenetre, tempTemplate, cv.TM_CCORR_NORMED)
+                else:
+                    corMatrice = cv.matchTemplate(sousFenetre, template, cv.TM_CCORR_NORMED)
+                cor = max(map(max, corMatrice))
+                if cor > maxCor:
+                    maxCor = cor
+                    match = candidat
+
+        #garder le maximum si un maximum est resonable
+        if(maxCor > confidenceBound):
+            matchedptsG.append(pt)
+            matchedptsD.append(match)
+            nb+=1
+            if(nb%10==0):
+                print("found ", nb, "matches so far")
+        else:
+            abberantG.append(pt)
+            abberantD.append(match)
+        
+        # TODO
+        # modifier le check pour inclure la disparite maximale et non la confiance
+        # ca va permettre d evaluer les donnes abberante apres...
+
+
+    cv.destroyAllWindows()
+    np.int32(matchedptsD)
+    np.int32(matchedptsG)
+    np.int32(abberantG)
+    np.int32(abberantD)
+
+    return matchedptsG, matchedptsD, abberantG, abberantD
+
+
 def RunRansac():
     #========================================================
     #       HARDCODED PARAMS (a prendre en argument later)
     #========================================================
     confidenceBound = 0.55
     nbIteration = 10
-    samplesize = 2
+    samplesize = 8
     windowsize = 60 #en fait juste la moitier paire du windowsize
     dispariteMax = 500
-    searchwindow = 200
 
 
     #========================================================
     #       preparer l'image
     #========================================================
-    imgName = "./whitebackground/testingwbg.jpg"
+    #imgName = "./whitebackground/testingwbg.jpg"
+    imgName = "./images/cattest.jpg"
     img = cv.imread(imgName, 0)
 
     moitier = len(img[0])/2
@@ -282,69 +356,15 @@ def RunRansac():
     #       Mise en correspondance initiale
     #========================================================
 
-
-    # paddedimgG = np.pad(edgesG, ((windowsize, windowsize), (windowsize,windowsize)), 'constant', constant_values=((0,0),(0,0)))
-
-    matchedptsD = []
-    matchedptsG = []
-    abberantD = []
-    abberantG = []
-    it = 0
-    nb = 0
-    for pt in coordoPtsG:
-        it += 1
-        if(it%15==0):
-            print(it)
-
-        # pour chaque poits Gauche
-        # creer une sousmatrice qui inclus le voisinage
-        template = ConstructWindow(imgG, pt, windowsize)
-            
-        
-        # evaluer tous les points Droits
-        maxCor = 0
-        match = (0,0)
-        for candidat in coordoPtsD:
-            if(abs(pt[1] - candidat[1]) < 30) and (abs(pt[0] - candidat[0]) < dispariteMax):
-
-                sousFenetre = ConstructWindow(imgD, candidat, windowsize)
-                if(len(template) > len(sousFenetre)) or len(template[0]) > len(sousFenetre[0]):
-                    tempTemplate = ConstructWindow(imgG, pt, min(int(len(sousFenetre)/2),int(len(sousFenetre[0])/2)))
-
-
-                    corMatrice = cv.matchTemplate(sousFenetre, tempTemplate, cv.TM_CCORR_NORMED)
-                else:
-                    corMatrice = cv.matchTemplate(sousFenetre, template, cv.TM_CCORR_NORMED)
-                cor = max(map(max, corMatrice))
-                if cor > maxCor:
-                    maxCor = cor
-                    match = candidat
-
-        #garder le maximum si un maximum est resonable
-        if(maxCor > confidenceBound):
-            matchedptsG.append(pt)
-            matchedptsD.append(match)
-            nb+=1
-            if(nb%10==0):
-                print("found ", nb, "matches so far")
-
-
-    cv.destroyAllWindows()
-    np.int32(matchedptsD)
-    np.int32(matchedptsG)
+    matchedptsG, matchedptsD, aberrantG, aberrantD = FindMatches(imgG, imgD, coordoPtsG, coordoPtsD, windowsize,dispariteMax,confidenceBound)
 
 
 
-    cormatG, cormatD = drawdot(imgG, imgD, matchedptsG,matchedptsD)
-    resG, resD = drawlines(cormatG, cormatD, matchedptsG,matchedptsD)
-    
+    resG, resD = drawdotetline(imgG, imgD, matchedptsG,matchedptsD)
+    disG, disD = drawdotetline(imgG, imgD, aberrantG, aberrantD)
     PrintConcatImg(resG,resD, "matching")
-    # cormatG, cormatD = drawdot(edgesG, imgD, abberantG,abberantD)
-    # PrintConcatImg(cormatG,cormatD, "matching")
-    # cormatG, cormatD = drawdot(imgG, imgD, matchedptsG,matchedptsD)
-    # PrintConcatImg(cormatG,cormatD, "matching")
+    PrintConcatImg(disG,disD, "aberante")
     cv.destroyAllWindows()
-
 
         
 
@@ -353,11 +373,19 @@ def RunRansac():
     #       Mise en correspondance avec un sous-ensemble aleatoire
     #========================================================
 
-    # randomSampledPts = []
-    # for i in range(samplesize):
-    #     candidat = coordoPtsG[randrange(nbPtsG)]
-    #     randomSampledPts.append(candidat)
-    #     template = ConstructTemplate(paddedimgG, candidat, windowsize) 
+    S_gauche = []
+    S_droit = []
+    for i in range(samplesize):
+        candidat = randrange(nbPtsG)
+        S_gauche.append(matchedptsG[candidat])
+        S_droit.append(matchedptsD[candidat])
+
+    np.int32(S_gauche)
+    np.int32(S_droit)
+
+    print("size", len(S_gauche))
+    F_k = cv.findFundamentalMat(S_gauche, S_droit, cv.FM_8POINT)
+    print(F_k)
         
 
 
