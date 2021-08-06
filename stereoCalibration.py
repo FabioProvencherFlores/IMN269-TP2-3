@@ -2,13 +2,14 @@
 # pip install numpy
 # pip install opencv-python
 import numpy as np
-from numpy import unravel_index
+from numpy import float32, unravel_index
 import cv2 as cv
 import sys
 import glob
 from matplotlib import pyplot as plt
 from random import randrange
-from scipy import signal
+from numpy import linalg
+from scipy.linalg import solve
 
 # chessboard size
 cbSize = (7, 9)
@@ -109,84 +110,6 @@ def Key2Coordo(keypt):
     return ar
 
 
-def Process(F):
-    img = cv.imread("./images/cattest.jpg", 0)
-    print(len(img), len(img[0]))
-    # imgG = cv.imread('images/othertest1.jpg', 0)
-    # imgD = cv.imread('images/othertest2.jpg', 0)
-
-    moitier = len(img[0])/2
-    imgG = img[:, :int(moitier)]
-    imgD = img[:, int(moitier):]
-
-    # h = 960 w = 1280
-    print(len(imgG), len(imgG[0]))
-    print(len(imgD), len(imgD[0]))
-
-    # Trouver les points d'interets
-
-    sift = cv.SIFT_create()
-    keypointsG, waste1 = sift.detectAndCompute(imgG, None)
-    keypointsD, waste2 = sift.detectAndCompute(imgD, None)
-
-    # PrintPoints(keypointsD)
-    tupleG = Key2Coordo(keypointsG)
-    tupleD = Key2Coordo(keypointsD)
-
-    # for pt in tupleG:
-    #     cv.circle(imgD, pt,3,(0,0,200))
-    # for pt in tupleG:
-    #     cv.circle(imgG, pt,3,(0,0,200))
-
-    FLANN_INDEX_KDTREE = 1
-    index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-    search_params = dict(checks=50)
-
-    flann = cv.FlannBasedMatcher(index_params, search_params)
-    matches = flann.knnMatch(waste1, waste2, k=2)
-
-    pts1 = []
-    pts2 = []
-    # ratio test as per Lowe's paper
-    for i, (m, n) in enumerate(matches):
-        if m.distance < 0.8*n.distance:
-            pts2.append(keypointsG[m.trainIdx].pt)
-            pts1.append(keypointsD[m.queryIdx].pt)
-    # TODO
-    # extraire les points de pointsG et pointsD parce que cest des arrays weird...
-
-    pts1 = np.int32(pts1)
-    pts2 = np.int32(pts2)
-
-    # findFundamentaMat prend des array de points d interets, pas tous les images
-    fondMat, mask = cv.findFundamentalMat(
-        tupleG, tupleD[:len(tupleG)], cv.FM_RANSAC, 3, 0.99)
-    pts1 = pts1[mask.ravel() == 1]
-    pts2 = pts2[mask.ravel() == 1]
-
-    lines = cv.computeCorrespondEpilines(pts2.reshape(-1, 1, 2), 2, fondMat)
-    lines = lines.reshapre(-1, 3)
-
-    r, c = imgG.shape
-    imgG = cv.cvtColor(imgG, cv.COLOR_GRAY2BGR)
-    imgD = cv.cvtColor(imgD, cv.COLOR_GRAY2BGR)
-    for r, pt1, pt2 in zip(lines, pts1, pts2):
-        color = tuple(np.random.randint(0, 255, 3).tolist())
-        x0, y0 = map(int, [0, -r[2]/r[1]])
-        x1, y1 = map(int, [c, -(r[2]+r[0]*c)/r[1]])
-        imgG = cv.line(imgG, (x0, y0), (x1, y1), color, 1)
-        imgG = cv.circle(imgG, tuple(pt1), 5, color, -1)
-        imgD = cv.circle(imgD, tuple(pt2), 5, color, -1)
-
-    # print(pointsG[:10])
-    res = cv.hconcat([imgG, imgD])
-    cv.imshow("resultat", res)
-    cv.waitKey(0)
-
-    # lignes = cv.computeCorrespondEpilines(pointsD.reshape(-1,1,2), 2,F)
-    # lignes = lignes.reshape(-1,3)
-
-
 # Copier de la doc
 # Voir https://docs.opencv.org/4.5.2/da/de9/tutorial_py_epipolar_geometry.html
 def drawlines(img1,img2, pts1,pts2):
@@ -220,6 +143,20 @@ def drawdotetline(img1, img2, pts1, pts2):
         img2 = cv.circle(img2,p2,5,color,-1)
         img1 = cv.line(img1, p1, p2, color,1)
     return img1, img2
+def drawepipipiplines(img1,img2,lines,pts1,pts2):
+    ''' img1 - image on which we draw the epilines for the points in img2
+        lines - corresponding epilines '''
+    r,c = img1.shape
+    img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
+    img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
+    for r,pt1,pt2 in zip(lines,pts1,pts2):
+        color = tuple(np.random.randint(0,255,3).tolist())
+        x0,y0 = map(int, [0, -r[2]/r[1] ])
+        x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
+        img1 = cv.line(img1, (x0,y0), (x1,y1), color,1)
+        img1 = cv.circle(img1,tuple(pt1),5,color,-1)
+        img2 = cv.circle(img2,tuple(pt2),5,color,-1)
+    return img1,img2
 
 def ConstructWindow(img, coordo, sizeT):
     #reduit la taille de la fenetre sur les bords
@@ -238,6 +175,37 @@ def PrintConcatImg(imgG, imgD, title):
     cv.waitKey(0)
     cv.destroyAllWindows()
 
+def SaveImg(imgG, imgD, filename):
+    res = cv.hconcat([imgG, imgD])
+    cv.imwrite("./result/" + filename, res)
+
+def FindSinglePoint(imgG, imgD, pt, pointsD, boxsize, disparityMax):
+    # pour chaque poits Gauche
+    # creer une sousmatrice qui inclus le voisinage
+    template = ConstructWindow(imgG, pt, boxsize)
+        
+    
+    # evaluer tous les points Droits
+    maxCor = 0
+    match = (0,0)
+    for candidat in pointsD:
+        if(abs(pt[1] - candidat[1]) < 30) and (abs(pt[0] - candidat[0]) < disparityMax):
+
+            sousFenetre = ConstructWindow(imgD, candidat, boxsize)
+            if(len(template) > len(sousFenetre)) or len(template[0]) > len(sousFenetre[0]):
+                tempTemplate = ConstructWindow(imgG, pt, min(int(len(sousFenetre)/2),int(len(sousFenetre[0])/2)))
+
+
+                corMatrice = cv.matchTemplate(sousFenetre, tempTemplate, cv.TM_CCORR_NORMED)
+            else:
+                corMatrice = cv.matchTemplate(sousFenetre, template, cv.TM_CCORR_NORMED)
+            cor = max(map(max, corMatrice))
+            if cor > maxCor:
+                maxCor = cor
+                match = candidat
+    return match, maxCor
+
+
 def FindMatches(imgG, imgD, pointsG, pointsD, boxsize, disparityMax, confidenceBound):
     matchedptsD = []
     matchedptsG = []
@@ -247,35 +215,13 @@ def FindMatches(imgG, imgD, pointsG, pointsD, boxsize, disparityMax, confidenceB
     nb = 0
     for pt in pointsG:
         it += 1
-        if(it%15==0):
-            print(it)
+        #if(it%15==0):
+            #print(it)
 
-        # pour chaque poits Gauche
-        # creer une sousmatrice qui inclus le voisinage
-        template = ConstructWindow(imgG, pt, boxsize)
-            
-        
-        # evaluer tous les points Droits
-        maxCor = 0
-        match = (0,0)
-        for candidat in pointsD:
-            if(abs(pt[1] - candidat[1]) < 30) and (abs(pt[0] - candidat[0]) < disparityMax):
-
-                sousFenetre = ConstructWindow(imgD, candidat, boxsize)
-                if(len(template) > len(sousFenetre)) or len(template[0]) > len(sousFenetre[0]):
-                    tempTemplate = ConstructWindow(imgG, pt, min(int(len(sousFenetre)/2),int(len(sousFenetre[0])/2)))
-
-
-                    corMatrice = cv.matchTemplate(sousFenetre, tempTemplate, cv.TM_CCORR_NORMED)
-                else:
-                    corMatrice = cv.matchTemplate(sousFenetre, template, cv.TM_CCORR_NORMED)
-                cor = max(map(max, corMatrice))
-                if cor > maxCor:
-                    maxCor = cor
-                    match = candidat
+        match, maxCor = FindSinglePoint(imgG, imgD, pt, pointsD, boxsize, disparityMax)
 
         #garder le maximum si un maximum est resonable
-        if(maxCor > confidenceBound):
+        if(abs(pt[1] - match[1]) < 30) and (abs(pt[0] - match[0]) < disparityMax) and maxCor > confidenceBound:
             matchedptsG.append(pt)
             matchedptsD.append(match)
             nb+=1
@@ -299,13 +245,15 @@ def FindMatches(imgG, imgD, pointsG, pointsD, boxsize, disparityMax, confidenceB
     return matchedptsG, matchedptsD, abberantG, abberantD
 
 
-def RunRansac():
+
+
+def RunRansac(FondMat):
     #========================================================
     #       HARDCODED PARAMS (a prendre en argument later)
     #========================================================
-    confidenceBound = 0.55
+    confidenceBound = 0.35
     nbIteration = 10
-    samplesize = 8
+    samplesize = 9
     windowsize = 60 #en fait juste la moitier paire du windowsize
     dispariteMax = 500
 
@@ -347,7 +295,7 @@ def RunRansac():
     print("for example: ", coordoPtsD[nbPtsD-3])
 
     imgggg, imgddd = drawdot(edgesG, edgesD, coordoPtsG, coordoPtsD)
-    PrintConcatImg(imgggg, imgddd, "test")
+    #PrintConcatImg(imgggg, imgddd, "test")
    
 
 
@@ -362,61 +310,67 @@ def RunRansac():
 
     resG, resD = drawdotetline(imgG, imgD, matchedptsG,matchedptsD)
     disG, disD = drawdotetline(imgG, imgD, aberrantG, aberrantD)
-    PrintConcatImg(resG,resD, "matching")
-    PrintConcatImg(disG,disD, "aberante")
+    #PrintConcatImg(resG,resD, "matching")
+    #PrintConcatImg(disG,disD, "aberante")
+    SaveImg(resG,  resD, "correlationmatchin.jpg")
+    SaveImg(disG, disD, "correlationaberant.jpg")
     cv.destroyAllWindows()
 
         
 
-
     #========================================================
-    #       Mise en correspondance avec un sous-ensemble aleatoire
+    #       difference entre F et correlation
     #========================================================
+    toprintG = []
+    toprintD1 = []
+    toprintD2 = []
 
-    S_gauche = []
-    S_droit = []
-    for i in range(samplesize):
-        candidat = randrange(nbPtsG)
-        S_gauche.append(matchedptsG[candidat])
-        S_droit.append(matchedptsD[candidat])
+    # for ptG, ptD in matchedptsG, matchedptsD:
+    #     line = cv.com
+    pointsG = np.array(matchedptsG)
+    pointsD = np.array(matchedptsD)
 
-    np.int32(S_gauche)
-    np.int32(S_droit)
+    lines = cv.computeCorrespondEpilines(pointsG.reshape(-1,1,2), 2,FondMat)
+    lines = lines.reshape(-1,3)
+    resG,resD = drawepipipiplines(imgG,imgD,lines,pointsG,matchedptsD)
+    #PrintConcatImg(resG, resD, "testtt")
 
-    print("size", len(S_gauche))
-    F_k = cv.findFundamentalMat(S_gauche, S_droit, cv.FM_8POINT)
-    print(F_k)
-        
+    img1 = imgG.copy()
+    img2 = imgD.copy()
+    r,c = img1.shape 
+    img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
+    img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
+    print("to test now...", len(pointsG))
+    asdf = 0
+    for r,pt1,pt2 in zip(lines,pointsG,pointsD):
+        asdf+=1
+        if(asdf%15 == 0):
+            print(asdf)
+        color = tuple(np.random.randint(0,255,3).tolist())
+        x0,y0 = map(int, [0, -r[2]/r[1] ])
+        x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
+        x = [x0, x1]
+        y = [y0, y1]
+        x_coor = np.arange(1, x1)
+        y_coor = np.interp(x_coor, x, y)
+        coordinates = np.column_stack((x_coor, y_coor))
+        linePT = np.int32(coordinates)
+        ptTest = []
+        for p in linePT:
+            if p[0] < len(img1) and p[1] < len(img1[1]):
+                ptTest.append(p)
+
+        foundpt, cor = FindSinglePoint(img1, img2, pt1, np.int32(ptTest),windowsize, dispariteMax)
+        if(cor > confidenceBound):
+            toprintG.append(pt1)
+            toprintD1.append(pt2)
+            toprintD2.append(foundpt)
 
 
 
-
-    FLANN_INDEX_KDTREE = 1
-    index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-    search_params = dict(checks=50)
-
-    flann = cv.FlannBasedMatcher(index_params, search_params)
-    matches = flann.knnMatch(waste1, waste2, k=2)
-
-    pts1 = []
-    pts2 = []
-    # ratio test as per Lowe's paper
-    # for i, (m, n) in enumerate(matches):
-    #     if m.distance < 0.8*n.distance:
-    #         pts2.append(keypointsG[m.trainIdx].pt)
-    #         pts1.append(keypointsD[m.queryIdx].pt)
-    # TODO
-    # extraire les points de pointsG et pointsD parce que cest des arrays weird...
-
-    pts1 = np.int32(pts1)
-    pts2 = np.int32(pts2)
-    return "f"
-
+    print("finalement", len(toprintG))
 
 if __name__ == "__main__":
-    #F = Calibrationnage()
-    # print(F)
-    F = "f"
-    #Process(F)
-    RunRansac()   
+    F = Calibrationnage()
+    RunRansac(F)   
 
