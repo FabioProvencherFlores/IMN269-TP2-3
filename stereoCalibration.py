@@ -19,6 +19,9 @@ imgSize = [1280, 960]
 
 # calibration images
 calibImages = glob.glob("./calibDir/*")
+#imgName = "./whitebackground/testingwbg.jpg"
+#imgName = "./images/testimage.jpg"
+imgName = "./images/cattest.jpg"
 
 # criteria for opencv calibration
 criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -189,7 +192,7 @@ def FindSinglePoint(imgG, imgD, pt, pointsD, boxsize, disparityMax):
     maxCor = 0
     match = (0,0)
     for candidat in pointsD:
-        if(abs(pt[1] - candidat[1]) < 30) and (abs(pt[0] - candidat[0]) < disparityMax):
+        if (2 <6 ): #(abs(pt[1] - candidat[1]) < 30) and (abs(pt[0] - candidat[0]) < disparityMax):
 
             sousFenetre = ConstructWindow(imgD, candidat, boxsize)
             if(len(template) > len(sousFenetre)) or len(template[0]) > len(sousFenetre[0]):
@@ -247,7 +250,7 @@ def FindMatches(imgG, imgD, pointsG, pointsD, boxsize, disparityMax, confidenceB
 
 
 
-def RunRansac(FondMat):
+def MiseEnCorrespondance(FondMat):
     #========================================================
     #       HARDCODED PARAMS (a prendre en argument later)
     #========================================================
@@ -261,9 +264,7 @@ def RunRansac(FondMat):
     #========================================================
     #       preparer l'image
     #========================================================
-    imgName = "./whitebackground/testingwbg.jpg"
-    #imgName = "./images/testimage.jpg"
-    #imgName = "./images/cattest.jpg"
+
     img = cv.imread(imgName, 0)
 
     moitier = len(img[0])/2
@@ -278,8 +279,8 @@ def RunRansac(FondMat):
     #       trouver les points d'interes
     #========================================================
 
-    edgesG = cv.Canny(imgG, 120, 120)
-    edgesD = cv.Canny(imgD, 120, 120)
+    edgesG = imgG#cv.Canny(imgG, 120, 120)
+    edgesD = imgD#cv.Canny(imgD, 120, 120)
     print(len(edgesD),len(edgesD[0]))
 
 
@@ -335,14 +336,31 @@ def RunRansac(FondMat):
     p1, p2 = cv.correctMatches(FondMat,pt1, pt2)
 
 
-	# Setting parameters for StereoSGBM algorithm
-    minDisparity = 0
-    numDisparities = 64
+
+    lines = cv.computeCorrespondEpilines(pointsG.reshape(-1,1,2), 2,FondMat)
+    lines = lines.reshape(-1,3)
+    resG,resD = drawepipipiplines(imgG,imgD,lines,pointsG,matchedptsD)
+    SaveImg(resG,resD,"droiteepipolaire.jpg")
+
+    return imgG, imgD, matchedptsG, matchedptsD
+
+def Disparite(t1, t2):
+
+    img = cv.imread(imgName, 0)
+
+    moitier = len(img[0])/2
+    imgG = img[:, :int(moitier)]
+    imgD = img[:, int(moitier):]
+
+    	# Setting parameters for StereoSGBM algorithm
+    minDisparity = 100
+    maxDisparity = 300
+    numDisparities = maxDisparity-minDisparity
     blockSize =3
-    disp12MaxDiff = 90
-    uniquenessRatio = 10
-    speckleWindowSize =15
-    speckleRange = 8
+    disp12MaxDiff = 1
+    uniquenessRatio = 5
+    speckleWindowSize =10000
+    speckleRange = 50
 	 
 	# Creating an object of StereoSGBM algorithm
     stereomatcher = cv.StereoSGBM_create(minDisparity = minDisparity,
@@ -351,29 +369,25 @@ def RunRansac(FondMat):
             disp12MaxDiff = disp12MaxDiff,
             uniquenessRatio = uniquenessRatio,
             speckleWindowSize = speckleWindowSize,
-            speckleRange = speckleRange
+            speckleRange = speckleRange,
+            P1=8 * 1 * blockSize * blockSize,
+            P2=32 * 1 * blockSize * blockSize,
         )
 
     disparityMap = stereomatcher.compute(imgG, imgD).astype(np.float32)
-    disparityMap = cv.cvtColor(disparityMap,cv.COLOR_GRAY2BGR)
-    # for kptG in matchedptsG:
-    #     color = tuple(np.random.randint(0,255,3).tolist())
-    #     disparityMap = cv.circle(disparityMap,tuple(kptG),5,color,-1)
-
+    disparityMap = cv.normalize(disparityMap, disparityMap,alpha = 255,beta = 0,norm_type= cv.NORM_MINMAX)
+    cv.imshow("disp", disparityMap)
+    cv.waitKey(0)
     cv.imwrite("result/disparitymap.jpg", disparityMap)
-
-    lines = cv.computeCorrespondEpilines(pointsG.reshape(-1,1,2), 2,FondMat)
-    lines = lines.reshape(-1,3)
-    resG,resD = drawepipipiplines(imgG,imgD,lines,pointsG,matchedptsD)
-    SaveImg(resG,resD,"droiteepipolaire.jpg")
-
-
 
 
 
 
 
 if __name__ == "__main__":
-    F = Calibrationnage()
-    RunRansac(F)   
+    #F = Calibrationnage()
+    i1, i2 = 1, 2
+    #i1, i2, p1, p2 = MiseEnCorrespondance(F)   
+
+    Disparite(i1, i2)
 
