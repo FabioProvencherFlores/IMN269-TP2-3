@@ -4,12 +4,15 @@
 import numpy as np
 from numpy import float32, unravel_index
 import cv2 as cv
-import sys
 import glob
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import proj3d
 from random import randrange
-from numpy import linalg
+from numpy.core.fromnumeric import shape
+from numpy.lib.utils import deprecate
 from scipy.linalg import solve
+import rasterio.fill as rast
+
 
 # chessboard size
 cbSize = (7, 9)
@@ -20,15 +23,15 @@ imgSize = [1280, 960]
 # calibration images
 calibImages = glob.glob("./calibDir/*")
 #imgName = "./whitebackground/testingwbg.jpg"
+imgName = "./lasttest/ttt.jpg"
 #imgName = "./images/testimage.jpg"
-imgName = "./images/cattest.jpg"
+#imgName = "./images/cattest.jpg"
 
 # criteria for opencv calibration
 criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 objP = np.zeros((cbSize[0]*cbSize[1], 3), np.float32)
 
 # object points in 3D coordinates
-# real size is 20 mm, so we must multiply by 20 to account it in
 objP[:, :2] = np.mgrid[0:cbSize[0], 0:cbSize[1]].T.reshape(-1, 2)*20
 
 # array for object points, left and right image points
@@ -104,7 +107,16 @@ def Calibrationnage():
     print("\nDistorsion left:\n", distL)
     print("\nDistorsion right:\n", distR)
 
-    return fundamentalMatrix
+
+    img = cv.imread(imgName, 0)
+
+    moitier = len(img[0])/2
+    imgG = img[:, :int(moitier)]
+    imgD = img[:, int(moitier):]
+
+    SaveImg(imgG, imgD, "testingimage.jpg")
+
+    return fundamentalMatrix, newCameraMatrixL
 
 
 def Key2Coordo(keypt):
@@ -185,22 +197,25 @@ def SaveImg(imgG, imgD, filename):
 def FindSinglePoint(imgG, imgD, pt, pointsD, boxsize, disparityMax):
     # pour chaque poits Gauche
     # creer une sousmatrice qui inclus le voisinage
+
     template = ConstructWindow(imgG, pt, boxsize)
         
     
     # evaluer tous les points Droits
     maxCor = 0
     match = (0,0)
-    for candidat in pointsD:
-        if (2 <6 ): #(abs(pt[1] - candidat[1]) < 30) and (abs(pt[0] - candidat[0]) < disparityMax):
 
+    for candidat in pointsD:
+
+        if (abs(pt[1] - candidat[1]) < 30) and (abs(pt[0] - candidat[0]) < disparityMax):
+                
             sousFenetre = ConstructWindow(imgD, candidat, boxsize)
             if(len(template) > len(sousFenetre)) or len(template[0]) > len(sousFenetre[0]):
                 tempTemplate = ConstructWindow(imgG, pt, min(int(len(sousFenetre)/2),int(len(sousFenetre[0])/2)))
 
 
                 corMatrice = cv.matchTemplate(sousFenetre, tempTemplate, cv.TM_CCORR_NORMED)
-            else:
+            else:    
                 corMatrice = cv.matchTemplate(sousFenetre, template, cv.TM_CCORR_NORMED)
             cor = max(map(max, corMatrice))
             if cor > maxCor:
@@ -228,15 +243,13 @@ def FindMatches(imgG, imgD, pointsG, pointsD, boxsize, disparityMax, confidenceB
             matchedptsG.append(pt)
             matchedptsD.append(match)
             nb+=1
-            if(nb%10==0):
+            if(nb%100==0):
                 print("found ", nb, "matches so far")
         else:
             abberantG.append(pt)
             abberantD.append(match)
         
-        # TODO
-        # modifier le check pour inclure la disparite maximale et non la confiance
-        # ca va permettre d evaluer les donnes abberante apres...
+
 
 
     cv.destroyAllWindows()
@@ -279,11 +292,11 @@ def MiseEnCorrespondance(FondMat):
     #       trouver les points d'interes
     #========================================================
 
-    edgesG = imgG#cv.Canny(imgG, 120, 120)
-    edgesD = imgD#cv.Canny(imgD, 120, 120)
+    edgesG = cv.Canny(imgG, 120, 120)
+    edgesD = cv.Canny(imgD, 120, 120)
     print(len(edgesD),len(edgesD[0]))
 
-
+    SaveImg(edgesG, edgesD, "filtreCanny.jpg")
 
     sift = cv.SIFT_create()
     keypointsG, waste1 = sift.detectAndCompute(edgesG, None)
@@ -297,8 +310,9 @@ def MiseEnCorrespondance(FondMat):
     print("for example: ", coordoPtsD[nbPtsD-3])
 
     imgggg, imgddd = drawdot(edgesG, edgesD, coordoPtsG, coordoPtsD)
-    #PrintConcatImg(imgggg, imgddd, "test")
-   
+    imggg, imgdd = drawdot(imgG, imgD, coordoPtsG, coordoPtsD)
+    SaveImg(imgggg, imgddd, "pointsInteretCanny.jpg")
+    SaveImg(imggg, imgdd, "pointsdinteresimg.jpg")
 
 
 
@@ -352,15 +366,15 @@ def Disparite(t1, t2):
     imgG = img[:, :int(moitier)]
     imgD = img[:, int(moitier):]
 
-    	# Setting parameters for StereoSGBM algorithm
-    minDisparity = 100
-    maxDisparity = 300
+
+    minDisparity = 16
+    maxDisparity = 128
     numDisparities = maxDisparity-minDisparity
-    blockSize =3
-    disp12MaxDiff = 1
+    blockSize = 3
+    disp12MaxDiff = 12
     uniquenessRatio = 5
     speckleWindowSize =10000
-    speckleRange = 50
+    speckleRange = 100
 	 
 	# Creating an object of StereoSGBM algorithm
     stereomatcher = cv.StereoSGBM_create(minDisparity = minDisparity,
@@ -370,24 +384,128 @@ def Disparite(t1, t2):
             uniquenessRatio = uniquenessRatio,
             speckleWindowSize = speckleWindowSize,
             speckleRange = speckleRange,
-            P1=8 * 1 * blockSize * blockSize,
-            P2=32 * 1 * blockSize * blockSize,
+            P1=24 * 3 * blockSize * blockSize,
+            P2=64 * 3 * blockSize * blockSize,
+            preFilterCap=31,
+            
         )
 
-    disparityMap = stereomatcher.compute(imgG, imgD).astype(np.float32)
-    disparityMap = cv.normalize(disparityMap, disparityMap,alpha = 255,beta = 0,norm_type= cv.NORM_MINMAX)
-    cv.imshow("disp", disparityMap)
-    cv.waitKey(0)
-    cv.imwrite("result/disparitymap.jpg", disparityMap)
+    disparitymapNORMED = stereomatcher.compute(imgG, imgD)
+    disparityBRUTE = stereomatcher.compute(imgG, imgD)
+    disparitymapNORMED = cv.normalize(disparitymapNORMED, disparitymapNORMED,alpha = 255,beta = 0,norm_type= cv.NORM_MINMAX)
+    disparitymapNORMED = np.uint8(disparitymapNORMED)
+    # cv.imshow("disp", disparitymapNORMED)
+    # cv.waitKey(0)
+    # cv.destroyAllWindows()
+    SaveImg(disparitymapNORMED, imgG, "disparitymapNORMED.jpg")
+    return disparitymapNORMED, disparityBRUTE
+
+def fill(data, invalid=None):
+
+    if invalid is None: invalid = np.isnan(data)
+
+    res = rast.fillnodata(data, invalid)
+
+    return np.array(res)
+
+def ComputeDepth(disp, camMat, name):
+    res = disp.copy()
+
+    limite = 2
+    f = camMat[1][1]
+    mins = 999999
+    maxs = 0
+
+    invalidity = np.zeros(disp.shape,dtype=bool)
+    for y in range(len(disp)):
+        for x in range(len(disp[0])):
+            if disp[y][x] < limite:
+                invalidity[y][x] = True
+            else:
+                invalidity[y][x] = False
+
+    res = fill(res, invalidity)
+
+    depth = res.copy()
+
+    for y in range(len(res)):
+        for x in range(len(res[0])):
+            depth[y][x] = 62*f/res[y][x]
+            mins = min(depth[y][x], mins)
+            maxs = max(depth[y][x], maxs)
+
+    depth = np.float32(depth)
+    depth = cv.GaussianBlur(depth, (9,9), 0)
+    cv.imwrite(name, depth)
+
+    print("distance minimale ", mins)
+    print("distance maximale ", maxs)
+
+def createRender(disp):
+    img = cv.imread(imgName)
+
+    moitier = len(img[0])/2
+    imgG = img[:, :int(moitier)]
+    imgD = img[:, int(moitier):]
+
+    hauteur = len(imgG)
+    largeur = len(img[0])
+    x = range(len(imgG)
+    y = len(img[0])
+
+
+    render = np.zeros((hauteur, largeur, 3), dtype=np.float32)
+
+    for y in range(len(imgG)):
+        for x in range(len(imgG[0])):
+            render[y][x][disp[y],[x]] = imgG[y][x]
+    
+    # hauteur = len(imgG)
+    # largeur = len(img[0])
+
+    # render = np.zeros((hauteur, largeur, 3), dtype=np.float32)
+
+    # for y in range(len(imgG)):
+    #     for x in range(len(imgG[0])):
+    #         render[y][x][disp[y],[x]] = imgG[y][x]
+
+
+
+def calculeLine(p1, p2):
+    a = p2[1] - p1[1]
+    b = p2[0] - p1[0]
+    c = (a * p2[0]) + (b * p1[1])
+
+    return a, b, c
+
+def EvaluerPrecision(ptsG, ptsD, F, img):
+
+    print(len(ptsG))
+    print(len(ptsD))
+    ptsG = np.array(ptsG)
+
+    lines = cv.computeCorrespondEpilines(ptsG,1,F)
+
+    er = 0
+    for idx in range(len(ptsG)):
+        a,b,c = calculeLine(ptsG[idx], ptsD[idx])
+        estline = np.array([a,b,c]).reshape(3,1).transpose
+        er+=np.inner(estline, lines[idx])
+
+    print("erreur total: ", er)
 
 
 
 
 
 if __name__ == "__main__":
-    #F = Calibrationnage()
-    i1, i2 = 1, 2
-    #i1, i2, p1, p2 = MiseEnCorrespondance(F)   
-
-    Disparite(i1, i2)
+    F, m = Calibrationnage()
+    # i1, i2 = 1, 2
+    i1, i2, p1, p2 = MiseEnCorrespondance(F)  
+    #EvaluerPrecision(p1, p2, F, i1)
+    disp, dispbrute = Disparite(i1, i2)
+    ComputeDepth(disp, m, "result/depthmapNORMED.jpg")
+    ComputeDepth(dispbrute, m, "result/depthmap.jpg")
+    createRender(disp)
+    
 

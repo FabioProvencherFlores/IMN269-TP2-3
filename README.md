@@ -5,7 +5,8 @@ pip install numpy
 pip install opencv-python
 pip install matplotlib
 pip install scipy
+pip install rasterio
 sudo apt-get install python3-tk
 
 ### Utilisation
-python3 code/hello.py images/testimage.jpg
+python3 stereoCalibration.py
